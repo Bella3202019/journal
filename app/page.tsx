@@ -9,7 +9,7 @@ export default async function Page() {
   const accessToken = await getHumeAccessToken();
 
   if (!accessToken) {
-    throw new Error();
+    throw new Error('Failed to get Hume access token. Please check your configuration.');
   }
 
   return (
