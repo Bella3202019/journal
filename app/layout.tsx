@@ -6,7 +6,7 @@ import { DarkModeToggle } from "../components/DarkModeToggle";
 import { cn } from "@/utils";
 
 export const metadata: Metadata = {
-  title: "Dela",
+  title: "Dela: How's your day been?",
   description: "Your emotional support partner",
 };
 
