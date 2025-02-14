@@ -8,6 +8,12 @@ import { cn } from "@/utils";
 export const metadata: Metadata = {
   title: "Dela: How's your day been?",
   description: "Your emotional support partner",
+  openGraph: {
+    images: ['/title.png'],
+  },
+  twitter: {
+    images: ['/title.png'],
+  }
 };
 
 export default function RootLayout({
