@@ -7,8 +7,8 @@ import { ComponentRef, forwardRef, useEffect, useState, useRef } from "react";
 
 const getRandomPosition = () => {
   return {
-    x: Math.random() * (window.innerWidth - 400), // 考虑消息卡片宽度
-    y: Math.random() * (window.innerHeight - 200)  // 考虑消息卡片高度
+    x: Math.random() * (window.innerWidth - 400),
+    y: Math.random() * (window.innerHeight - 200)
   };
 };
 
@@ -26,70 +26,88 @@ const Messages = forwardRef<
       
       if (!messagePositions.current[messageKey] && 
           (msg.type === "user_message" || msg.type === "assistant_message")) {
-        // 为新消息生成随机位置
         messagePositions.current[messageKey] = getRandomPosition();
         
-        // 显示消息
         setVisibleMessages(prev => ({
           ...prev,
           [messageKey]: true
         }));
 
-        // 计算显示时间（根据内容长度）
-        const content = msg.message.content || "";
-        const duration = Math.max(3, content.length * 0.1); // 最少3秒
+        if ('message' in msg) {
+          const content = msg.message.content || "";
+          const duration = Math.max(3, content.length * 0.1);
 
-        // 设置消失时间
-        setTimeout(() => {
-          setVisibleMessages(prev => ({
-            ...prev,
-            [messageKey]: false
-          }));
-        }, duration * 1000);
+          setTimeout(() => {
+            setVisibleMessages(prev => ({
+              ...prev,
+              [messageKey]: false
+            }));
+          }, duration * 1000);
+        }
       }
     });
   }, [messages]);
 
   return (
-    <div className="fixed inset-0 pointer-events-none" style={{ zIndex: 1000 }}>
-      <AnimatePresence>
-        {messages.map((msg, index) => {
-          const messageKey = msg.type + index;
-          const position = messagePositions.current[messageKey];
+    <motion.div
+      layoutScroll
+      className={"grow rounded-md overflow-auto p-4"}
+      ref={ref}
+    >
+      <motion.div
+        className={"max-w-2xl mx-auto w-full flex flex-col gap-4 pb-24"}
+      >
+        <AnimatePresence mode={"popLayout"}>
+          {messages.map((msg, index) => {
+            if (
+              msg.type === "user_message" ||
+              msg.type === "assistant_message"
+            ) {
+              const messageKey = msg.type + index;
+              const position = messagePositions.current[messageKey];
 
-          if (!visibleMessages[messageKey] || !position) return null;
+              if (!visibleMessages[messageKey] || !position || !('message' in msg)) return null;
 
-          return (
-            <motion.div
-              key={messageKey}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              style={{
-                position: 'absolute',
-                left: position.x,
-                top: position.y,
-                zIndex: 1000
-              }}
-              className={cn(
-                "w-[300px]",
-                "bg-card",
-                "border border-border rounded-lg",
-                "pointer-events-auto"
-              )}
-            >
-              <div className="text-xs capitalize font-medium leading-none opacity-50 pt-4 px-3">
-                {msg.message.role}
-              </div>
-              <div className="pb-3 px-3">
-                {msg.message.content}
-              </div>
-              <Expressions values={{ ...msg.models.prosody?.scores }} />
-            </motion.div>
-          );
-        })}
-      </AnimatePresence>
-    </div>
+              return (
+                <motion.div
+                  key={msg.type + index}
+                  className={cn(
+                    "w-[300px]",
+                    "bg-card",
+                    "border border-border rounded-lg",
+                    "pointer-events-auto"
+                  )}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  style={{
+                    position: 'absolute',
+                    left: position.x,
+                    top: position.y,
+                    zIndex: 1000,
+                    maxWidth: '80%',
+                    width: '300px'
+                  }}
+                >
+                  <div className={cn(
+                    "text-xs capitalize font-medium leading-none opacity-50 pt-4 px-3"
+                  )}>
+                    {msg.message.role}
+                  </div>
+                  
+                  <div className={"pb-3 px-3"}>
+                    {msg.message.content}
+                  </div>
+                  
+                  <Expressions values={{ ...msg.models.prosody?.scores }} />
+                </motion.div>
+              );
+            }
+            return null;
+          })}
+        </AnimatePresence>
+      </motion.div>
+    </motion.div>
   );
 });
 
