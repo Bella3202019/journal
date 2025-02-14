@@ -14,13 +14,12 @@ export default function ClientComponent({
   const timeout = useRef<number | null>(null);
   const ref = useRef<ComponentRef<typeof Messages> | null>(null);
 
-  // optional: use configId from environment variable
   const configId = process.env['NEXT_PUBLIC_HUME_CONFIG_ID'];
   
   return (
     <div
       className={
-        "relative grow flex flex-col mx-auto w-full min-h-screen"
+        "relative grow flex flex-col mx-auto w-full overflow-hidden min-h-screen bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50 dark:from-emerald-900 dark:via-green-900 dark:to-teal-900"
       }
     >
       <VoiceProvider
