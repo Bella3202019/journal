@@ -5,10 +5,56 @@ import Expressions from "./Expressions";
 import { AnimatePresence, motion } from "framer-motion";
 import { ComponentRef, forwardRef, useEffect, useState, useRef } from "react";
 
-const getRandomPosition = () => {
+const getRandomPosition = (existingPositions: {[key: string]: {x: number, y: number}}, scrollY: number) => {
+  const padding = 20;
+  const maxAttempts = 50;
+  
+  const containerWidth = Math.min(window.innerWidth - 40, 800);
+  const containerHeight = Math.max(window.innerHeight * 2, window.innerHeight + scrollY + 500); // 增加滚动空间
+  const messageWidth = window.innerWidth < 640 ? 260 : 300;
+  
+  for (let i = 0; i < maxAttempts; i++) {
+    const newPosition = {
+      x: Math.max(20, Math.min(
+        Math.random() * (containerWidth - messageWidth),
+        containerWidth - messageWidth - 20
+      )),
+      y: Math.max(scrollY + 20, Math.min(
+        scrollY + Math.random() * (window.innerHeight - 150),
+        containerHeight - 150
+      ))
+    };
+
+    let hasOverlap = false;
+    for (const key in existingPositions) {
+      const existing = existingPositions[key];
+      const distance = Math.sqrt(
+        Math.pow(existing.x - newPosition.x, 2) + 
+        Math.pow(existing.y - newPosition.y, 2)
+      );
+      
+      if (distance < (window.innerWidth < 640 ? 280 : 320) + padding) {
+        hasOverlap = true;
+        break;
+      }
+    }
+
+    if (!hasOverlap) {
+      return newPosition;
+    }
+  }
+
+  // 垂直堆叠时考虑滚动位置
+  const existingCount = Object.keys(existingPositions).length;
   return {
-    x: Math.random() * (window.innerWidth - 400),
-    y: Math.random() * (window.innerHeight - 200)
+    x: Math.max(20, Math.min(
+      Math.random() * (containerWidth - messageWidth),
+      containerWidth - messageWidth - 20
+    )),
+    y: scrollY + Math.min(
+      existingCount * (170 + padding),
+      containerHeight - 150
+    )
   };
 };
 
@@ -19,6 +65,16 @@ const Messages = forwardRef<
   const { messages } = useVoice();
   const [visibleMessages, setVisibleMessages] = useState<{[key: string]: boolean}>({});
   const messagePositions = useRef<{[key: string]: {x: number, y: number}}>({});
+  const [scrollY, setScrollY] = useState(0);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrollY(window.scrollY);
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   useEffect(() => {
     messages.forEach((msg, index) => {
@@ -26,7 +82,7 @@ const Messages = forwardRef<
       
       if (!messagePositions.current[messageKey] && 
           (msg.type === "user_message" || msg.type === "assistant_message")) {
-        messagePositions.current[messageKey] = getRandomPosition();
+        messagePositions.current[messageKey] = getRandomPosition(messagePositions.current, scrollY);
         
         setVisibleMessages(prev => ({
           ...prev,
@@ -46,12 +102,15 @@ const Messages = forwardRef<
         }
       }
     });
-  }, [messages]);
+  }, [messages, scrollY]);
 
   return (
     <motion.div
       layoutScroll
-      className={"grow rounded-md overflow-auto p-4"}
+      className={cn(
+        "grow rounded-md overflow-auto p-4",
+        "min-h-[200vh]" // 确保有足够的滚动空间
+      )}
       ref={ref}
     >
       <motion.div
@@ -59,10 +118,7 @@ const Messages = forwardRef<
       >
         <AnimatePresence mode={"popLayout"}>
           {messages.map((msg, index) => {
-            if (
-              msg.type === "user_message" ||
-              msg.type === "assistant_message"
-            ) {
+            if (msg.type === "user_message" || msg.type === "assistant_message") {
               const messageKey = msg.type + index;
               const position = messagePositions.current[messageKey];
 
@@ -72,7 +128,7 @@ const Messages = forwardRef<
                 <motion.div
                   key={msg.type + index}
                   className={cn(
-                    "w-[300px]",
+                    "w-[260px] sm:w-[300px]",
                     "bg-card",
                     "border border-border rounded-lg",
                     "pointer-events-auto"
@@ -86,7 +142,6 @@ const Messages = forwardRef<
                     top: position.y,
                     zIndex: 1000,
                     maxWidth: '80%',
-                    width: '300px'
                   }}
                 >
                   <div className={cn(
