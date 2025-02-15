@@ -7,16 +7,18 @@ import StartCall from "./StartCall";
 import { ComponentRef, useRef } from "react";
 import { cn } from "@/utils";
 
+interface ClientComponentProps {
+  accessToken: string;
+}
+
 export default function ClientComponent({
   accessToken,
-}: {
-  accessToken: string;
-}) {
+}: ClientComponentProps) {
   const timeout = useRef<number | null>(null);
   const ref = useRef<ComponentRef<typeof Messages> | null>(null);
 
   const configId = process.env['NEXT_PUBLIC_HUME_CONFIG_ID'];
-  
+
   return (
     <div
       className={cn(
@@ -70,7 +72,6 @@ export default function ClientComponent({
           timeout.current = window.setTimeout(() => {
             if (ref.current) {
               const scrollHeight = ref.current.scrollHeight;
-
               ref.current.scrollTo({
                 top: scrollHeight,
                 behavior: "smooth",
