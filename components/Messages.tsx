@@ -108,15 +108,23 @@ const Messages = forwardRef<
     <motion.div
       layoutScroll
       className={cn(
-        "grow rounded-md overflow-auto p-4",
-        "min-h-[200vh]" // 确保有足够的滚动空间
+        "grow rounded-md p-4",
+        "md:overflow-hidden",
+        "overflow-auto",
+        "relative"
       )}
       ref={ref}
     >
       <motion.div
-        className={"max-w-2xl mx-auto w-full flex flex-col gap-4 pb-24"}
+        className={cn(
+          "max-w-2xl mx-auto w-full flex flex-col gap-4 pb-24",
+          "h-auto",
+          "md:h-fit",
+          "overflow-y-auto",
+          "md:overflow-visible"
+        )}
       >
-        <AnimatePresence mode={"popLayout"}>
+        <AnimatePresence mode="popLayout">
           {messages.map((msg, index) => {
             if (msg.type === "user_message" || msg.type === "assistant_message") {
               const messageKey = msg.type + index;

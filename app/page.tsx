@@ -18,7 +18,7 @@ export default async function Page() {
       "grow flex flex-col",
       "w-full max-w-screen min-h-screen",
       "md:max-w-none md:px-4",
-      "overflow-hidden",
+      "overflow-y-auto",
       "relative"
     )}>
       <div className="absolute inset-0 z-0">
