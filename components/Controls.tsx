@@ -6,9 +6,24 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Toggle } from "./ui/toggle";
 import MicFFT from "./MicFFT";
 import { cn } from "@/utils";
+import { forwardRef, useImperativeHandle } from "react";
 
-export default function Controls() {
+// 定义组件暴露的方法
+export interface ControlsRef {
+  mute: () => void;
+  unmute: () => void;
+  isMuted: boolean;
+}
+
+const Controls = forwardRef<ControlsRef, {}>((props, ref) => {
   const { disconnect, status, isMuted, unmute, mute, micFft } = useVoice();
+
+  // 暴露方法给父组件
+  useImperativeHandle(ref, () => ({
+    mute,
+    unmute,
+    isMuted
+  }));
 
   return (
     <div
@@ -62,11 +77,10 @@ export default function Controls() {
             </div>
 
             <Button
-              className={"flex items-center gap-1"}
+              className={"flex items-center gap-1 bg-red-500 hover:bg-red-600 text-white"}
               onClick={() => {
                 disconnect();
               }}
-              variant={"destructive"}
             >
               <span>
                 <Phone
@@ -82,4 +96,8 @@ export default function Controls() {
       </AnimatePresence>
     </div>
   );
-}
+});
+
+Controls.displayName = "Controls";
+
+export default Controls;

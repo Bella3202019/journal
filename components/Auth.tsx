@@ -62,20 +62,18 @@ export default function Auth({ onSuccess }: AuthProps) {
 
   // Google 登录
   const handleGoogleSignIn = async () => {
+    setIsLoading(true);
     try {
       const provider = new GoogleAuthProvider();
-      // 添加额外的 Google OAuth 范围
       provider.addScope('profile');
       provider.addScope('email');
       
-      // 强制每次都显示选择账号界面
       provider.setCustomParameters({
         prompt: 'select_account'
       });
 
       const { user } = await signInWithPopup(auth, provider);
       
-      // 检查并创建用户文档
       await createUserDocument(user.uid, {
         email: user.email,
         username: user.displayName,
@@ -84,7 +82,10 @@ export default function Auth({ onSuccess }: AuthProps) {
       });
 
       console.log('Google sign in successful');
-      onSuccess?.();
+      if (onSuccess) {
+        console.log('Calling onSuccess callback from Google sign in');
+        onSuccess();
+      }
     } catch (error: any) {
       console.error('Detailed Google sign in error:', error);
       
@@ -107,11 +108,15 @@ export default function Auth({ onSuccess }: AuthProps) {
       }
       
       alert(errorMessage);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   // 邮箱登录/注册
-  const handleEmailAuth = async () => {
+  const handleEmailAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
     try {
       if (isSignUp) {
         // 注册新用户
@@ -136,21 +141,25 @@ export default function Auth({ onSuccess }: AuthProps) {
         console.log('Sign up successful');
       } else {
         // 登录现有用户
-        const { user } = await signInWithEmailAndPassword(auth, email, password);
+        await signInWithEmailAndPassword(auth, email, password);
         console.log('Sign in successful');
         
         // 验证用户文档是否存在
-        const userExists = await checkUserExists(user.uid);
+        const userExists = await checkUserExists(auth.currentUser?.uid || '');
         if (!userExists) {
           // 如果用户文档不存在（罕见情况），创建一个
-          await createUserDocument(user.uid, {
-            email: user.email,
-            username: user.displayName || email.split('@')[0],
+          await createUserDocument(auth.currentUser?.uid || '', {
+            email: auth.currentUser?.email || '',
+            username: auth.currentUser?.displayName || '',
             authProvider: 'email',
           });
         }
       }
-      onSuccess?.();
+      console.log('Email auth successful');
+      if (onSuccess) {
+        console.log('Calling onSuccess callback from Email auth');
+        onSuccess();
+      }
     } catch (error: any) {
       console.error('Email auth error:', error);
       let message = 'Authentication failed. ';
@@ -176,6 +185,8 @@ export default function Auth({ onSuccess }: AuthProps) {
       }
       
       alert(message);
+    } finally {
+      setIsLoading(false);
     }
   };
 

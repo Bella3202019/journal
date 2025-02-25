@@ -23,6 +23,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import Image from 'next/image';
 
 export default function UserMenu() {
   const auth = getAuth(app);
@@ -68,16 +69,21 @@ export default function UserMenu() {
           <Button 
             variant="outline" 
             size="icon"
-            className="bg-white/80 dark:bg-zinc-900/80 hover:bg-white/90"
+            className="bg-white/80 dark:bg-zinc-900/80 hover:bg-white/90 overflow-hidden"
           >
             {user.photoURL ? (
-              <img 
-                src={user.photoURL} 
-                alt={user.displayName || 'User'} 
-                className="w-6 h-6 rounded-full"
+              <Image
+                src={user.photoURL}
+                alt={user.displayName || 'User avatar'}
+                width={24}
+                height={24}
+                className="rounded-full"
+                referrerPolicy="no-referrer"
               />
             ) : (
-              <User className="h-5 w-5" />
+              <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center text-white">
+                {(user.displayName || user.email || '?')[0].toUpperCase()}
+              </div>
             )}
           </Button>
         </DropdownMenuTrigger>

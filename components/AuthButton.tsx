@@ -25,8 +25,8 @@ export default function AuthButton() {
 
   const handleAuthSuccess = () => {
     setIsOpen(false);
-    // 登录成功后跳转到主页或指定页面
-    router.push('/dashboard'); // 或其他你想跳转的页面
+    // 登录成功后不进行跳转，只关闭对话框
+    // 移除了 router.push() 调用
   };
 
   if (loading) {
