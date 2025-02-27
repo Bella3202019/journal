@@ -28,34 +28,15 @@ export default async function Page() {
       "md:px-4",
       "overflow-hidden",
       
-      // Colors - 移除背景色，只保留文字颜色
-      "text-zinc-900",
-      
-      // Colors - Dark Mode
-      "dark:bg-zinc-900",
-      "dark:text-zinc-100",
+      // Colors
+      "bg-white dark:bg-zinc-900",
+      "text-zinc-900 dark:text-zinc-100",
     )}>
-      {/* Auth Button - Top Right */}
-      <div className={cn(
-        "absolute top-4 right-4",
-        "z-10",
-        // Ensure button visibility
-        "bg-white/80 dark:bg-zinc-900/80",
-        "backdrop-blur-sm",
-        "rounded-lg",
-        "p-1"
-      )}>
-        <AuthButton />
-      </div>
-
-      {/* Main Content */}
-      <div className={cn(
-        "flex-1",
-        "relative",
-        "z-0",
-        // Enforce white background
-        "bg-white dark:bg-zinc-900"
-      )}>
+      {/* 内容层 */}
+      <div className="relative z-10">
+        <div className="absolute top-4 right-4">
+          <AuthButton />
+        </div>
         <Chat accessToken={accessToken} />
       </div>
 
