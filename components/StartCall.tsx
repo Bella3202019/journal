@@ -2,19 +2,36 @@ import { useVoice } from "@humeai/voice-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Button } from "./ui/button";
 import { Phone } from "lucide-react";
+import { getAuth } from 'firebase/auth';
+import { storeChatMapping } from '@/lib/db';
+import { useEffect } from "react";
 
 export default function StartCall() {
-  const { status, connect } = useVoice();
+  const { status, connect, chatMetadata } = useVoice();
+  
+  useEffect(() => {
+    const saveChatMapping = async () => {
+      const auth = getAuth();
+      const user = auth.currentUser;
+      
+      if (user && chatMetadata?.chatId) {
+        try {
+          await storeChatMapping(user.uid, chatMetadata.chatId);
+        } catch (error) {
+          console.error("Failed to save chat mapping:", error);
+        }
+      }
+    };
 
-  const handleStartCall = () => {
-    connect()
-      .then(() => {
-        // Connection successful - voice stream starts
-      })
-      .catch((error) => {
-        // Handle connection errors (e.g. microphone access denied)
-        console.error("Failed to connect:", error);
-      });
+    saveChatMapping();
+  }, [chatMetadata]);
+
+  const handleStartCall = async () => {
+    try {
+      await connect();
+    } catch (error) {
+      console.error("Failed to connect:", error);
+    }
   };
 
   return (

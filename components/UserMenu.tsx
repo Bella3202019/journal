@@ -15,7 +15,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { User, LogOut, Edit } from "lucide-react";
+import { User, LogOut, Edit, History } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -24,13 +24,17 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import Image from 'next/image';
+import { HumeService } from '@/lib/hume';
+import { useRouter } from 'next/navigation';
 
 export default function UserMenu() {
+  const router = useRouter();
   const auth = getAuth(app);
   const [user] = useAuthState(auth);
   const [isEditNameOpen, setIsEditNameOpen] = useState(false);
   const [newUsername, setNewUsername] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 
   const handleSignOut = async () => {
     try {
@@ -58,6 +62,11 @@ export default function UserMenu() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleViewHistory = () => {
+    console.log('Navigating to history page...');
+    router.push('/history');
   };
 
   if (!user) return null;
@@ -98,6 +107,13 @@ export default function UserMenu() {
             </button>
           </div>
           <div className="h-px bg-gray-200 dark:bg-gray-800 my-1" />
+          <DropdownMenuItem 
+            onClick={handleViewHistory}
+            className="cursor-pointer"
+          >
+            <History className="mr-2 h-4 w-4" />
+            View History
+          </DropdownMenuItem>
           <DropdownMenuItem onClick={handleSignOut} className="cursor-pointer">
             <LogOut className="mr-2 h-4 w-4" />
             Sign out
