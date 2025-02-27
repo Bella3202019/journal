@@ -28,8 +28,7 @@ export default async function Page() {
       "md:px-4",
       "overflow-hidden",
       
-      // Colors - Light Mode (Enforced white)
-      "!bg-white",  // Added ! to ensure white background
+      // Colors - 移除背景色，只保留文字颜色
       "text-zinc-900",
       
       // Colors - Dark Mode

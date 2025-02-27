@@ -38,7 +38,7 @@ export default function StartCall() {
     <AnimatePresence mode="wait">
       {status.value !== "connected" ? (
         <motion.div
-          className="fixed inset-0 flex items-center justify-center bg-white/90 dark:bg-black/90 z-[200]"
+          className="fixed inset-0 flex items-center justify-center bg-white dark:bg-black z-[200]"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
