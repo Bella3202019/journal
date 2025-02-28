@@ -32,11 +32,13 @@ export default async function Page() {
       "bg-white dark:bg-zinc-900",
       "text-zinc-900 dark:text-zinc-100",
     )}>
+      {/* 修改 AuthButton 的位置 */}
+      <div className="fixed top-4 right-4 z-50">
+        <AuthButton />
+      </div>
+
       {/* 内容层 */}
       <div className="relative z-10">
-        <div className="absolute top-4 right-4">
-          <AuthButton />
-        </div>
         <Chat accessToken={accessToken} />
       </div>
 

@@ -74,60 +74,8 @@ const emotionColorMap: EmotionColorMap = {
   Yearning: "#DEB887",        // 实木色
 };
 
-const getRandomPosition = (existingPositions: {[key: string]: {x: number, y: number}}, scrollY: number) => {
-  const padding = 20;
-  const maxAttempts = 50;
-  
-  const containerWidth = Math.min(window.innerWidth - 40, 800);
-  const containerHeight = Math.max(window.innerHeight * 2, window.innerHeight + scrollY + 500); // 增加滚动空间
-  const messageWidth = window.innerWidth < 640 ? 260 : 300;
-  
-  for (let i = 0; i < maxAttempts; i++) {
-    const newPosition = {
-      x: Math.max(20, Math.min(
-        Math.random() * (containerWidth - messageWidth),
-        containerWidth - messageWidth - 20
-      )),
-      y: Math.max(scrollY + 20, Math.min(
-        scrollY + Math.random() * (window.innerHeight - 150),
-        containerHeight - 150
-      ))
-    };
-
-    let hasOverlap = false;
-    for (const key in existingPositions) {
-      const existing = existingPositions[key];
-      const distance = Math.sqrt(
-        Math.pow(existing.x - newPosition.x, 2) + 
-        Math.pow(existing.y - newPosition.y, 2)
-      );
-      
-      // 移动端增加间距
-      const minDistance = window.innerWidth < 640 ? 280 : 320;
-      if (distance < minDistance + padding) {
-        hasOverlap = true;
-        break;
-      }
-    }
-
-    if (!hasOverlap) {
-      return newPosition;
-    }
-  }
-
-  // 垂直堆叠时考虑滚动位置
-  const existingCount = Object.keys(existingPositions).length;
-  return {
-    x: Math.max(20, Math.min(
-      Math.random() * (containerWidth - messageWidth),
-      containerWidth - messageWidth - 20
-    )),
-    y: scrollY + Math.min(
-      existingCount * (170 + padding),
-      containerHeight - 150
-    )
-  };
-};
+// 添加响应式布局的辅助函数
+const isMobile = typeof window !== 'undefined' ? window.innerWidth < 768 : false;
 
 const Messages = forwardRef<
   ComponentRef<typeof motion.div>,
@@ -142,7 +90,7 @@ const Messages = forwardRef<
   const [userEmotionColors, setUserEmotionColors] = useState<string[]>(["#4169E1", "#87CEEB", "#B0C4DE"]);
   const [agentEmotionColors, setAgentEmotionColors] = useState<string[]>(["#4169E1", "#87CEEB", "#B0C4DE"]);
   const [isAgentSpeaking, setIsAgentSpeaking] = useState(false);
-
+  
   useEffect(() => {
     const handleScroll = () => {
       setScrollY(window.scrollY);
@@ -167,18 +115,92 @@ const Messages = forwardRef<
 
         if ('message' in msg) {
           const content = msg.message.content || "";
-          const duration = Math.max(3, content.length * 0.1);
-
-          setTimeout(() => {
-            setVisibleMessages(prev => ({
-              ...prev,
-              [messageKey]: false
-            }));
-          }, duration * 1000);
+          const duration = Math.max(10, content.length * 0.1);
         }
       }
     });
   }, [messages, scrollY]);
+
+  // 将 getRandomPosition 也移到组件内部
+  const getRandomPosition = (existingPositions: {[key: string]: {x: number, y: number}}, scrollY: number) => {
+    const padding = 20;
+    const maxAttempts = 50;
+    
+    const containerWidth = Math.min(window.innerWidth - 40, 800);
+    const containerHeight = Math.max(window.innerHeight * 2, window.innerHeight + scrollY + 500);
+    const messageWidth = window.innerWidth < 640 ? 260 : 300;
+    
+    for (let i = 0; i < maxAttempts; i++) {
+      const newPosition = {
+        x: Math.max(20, Math.min(
+          Math.random() * (containerWidth - messageWidth),
+          containerWidth - messageWidth - 20
+        )),
+        y: Math.max(scrollY + 20, Math.min(
+          scrollY + Math.random() * (window.innerHeight - 150),
+          containerHeight - 150
+        ))
+      };
+
+      let hasOverlap = false;
+      for (const key in existingPositions) {
+        const existing = existingPositions[key];
+        const distance = Math.sqrt(
+          Math.pow(existing.x - newPosition.x, 2) + 
+          Math.pow(existing.y - newPosition.y, 2)
+        );
+        
+        const minDistance = window.innerWidth < 640 ? 280 : 320;
+        if (distance < minDistance + padding) {
+          hasOverlap = true;
+          break;
+        }
+      }
+
+      if (!hasOverlap) {
+        return newPosition;
+      }
+    }
+
+    const existingCount = Object.keys(existingPositions).length;
+    return {
+      x: Math.max(20, Math.min(
+        Math.random() * (containerWidth - messageWidth),
+        containerWidth - messageWidth - 20
+      )),
+      y: scrollY + Math.min(
+        existingCount * (170 + padding),
+        containerHeight - 150
+      )
+    };
+  };
+
+  // 在 Messages 组件内部定义统一的高度
+  const standardHeight = 150; // 消息框的标准高度
+
+  const getMessagePosition = (index: number, type: string, scrollY: number) => {
+    const waveCenter = {
+      x: isMobile ? window.innerWidth * 0.5 : window.innerWidth * 0.25,
+      y: window.innerHeight * 0.5
+    };
+    
+    const messageWidth = window.innerWidth < 640 ? 260 : 300;
+    const verticalSpacing = 1.1;
+    
+    if (type === "assistant_message") {
+      const x = Math.max(20, waveCenter.x - messageWidth + (standardHeight * 0.5));
+      const y = (index * standardHeight * verticalSpacing);
+      return { x, y };
+    } else {
+      const x = Math.min(
+        window.innerWidth - messageWidth - 20,
+        waveCenter.x + (standardHeight * 0.5)
+      );
+      
+      const y = (index * standardHeight * verticalSpacing);
+      return { x, y };
+    }
+  };
 
   // 计算圆球大小
   const getCircleSize = () => {
@@ -244,20 +266,25 @@ const Messages = forwardRef<
   };
 
   // 添加响应式布局的辅助函数
-  const isMobile = window.innerWidth < 768;
   const getSize = (desktopSize: number, mobileRatio = 0.6) => 
     isMobile ? desktopSize * mobileRatio : desktopSize;
+
+  // 在渲染前添加调试日志
+  console.log('Agent emotion colors:', agentEmotionColors);
 
   return (
     <motion.div
       layoutScroll
       className={cn(
-        "grow rounded-md p-2 md:p-4", // 调整内边距
-        "overflow-auto",
-        "relative"
+        "grow rounded-md p-2 md:p-4",
+        "relative",
+        "bg-white",
+        "w-full",
+        "overflow-x-hidden"
       )}
       ref={ref}
     >
+      {/* 水波纹和圆形保持固定位置 */}
       {/* Agent的水波纹扇形 */}
       <motion.div
         className="fixed pointer-events-none"
@@ -271,34 +298,78 @@ const Messages = forwardRef<
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          zIndex: 100,
+          zIndex: 1000,
         }}
       >
+        {/* 内部实心渐变圆 */}
+        <motion.div
+          style={{
+            position: 'absolute',
+            width: `${standardHeight}px`,  // 使用标准高度
+            height: `${standardHeight}px`, // 使用标准高度
+            clipPath: 'inset(0 0 0 50%)',
+            background: `
+              radial-gradient(
+                circle at center,
+                ${agentEmotionColors[0]} 0%,
+                transparent 70%
+              ),
+              conic-gradient(
+                from 0deg at center,
+                ${agentEmotionColors[1] || agentEmotionColors[0]} 0deg,
+                ${agentEmotionColors[2] || agentEmotionColors[1] || agentEmotionColors[0]} 120deg,
+                ${agentEmotionColors[0]} 240deg,
+                ${agentEmotionColors[1] || agentEmotionColors[0]} 360deg
+              )
+            `,
+            borderRadius: '50%',
+            opacity: 0.9,
+            filter: 'blur(2px)',
+            zIndex: 1000,
+            border: 'none',
+          }}
+        />
+
+        {/* 外部水波纹 */}
         <>
           {[1, 2, 3].map((index) => (
             <motion.div
               key={index}
-              initial={{ scale: 0, opacity: 0.8 }}
+              initial={{ scale: 0.4, opacity: 0.8 }}
               animate={{ 
-                scale: [0, 1],
+                scale: [0.4, 1],
                 opacity: [0.8, 0],
               }}
               transition={{
-                duration: isMobile ? 1.5 : 2, // 移动端加快动画
+                duration: isMobile ? 10 : 15,
                 repeat: Infinity,
-                delay: index * (isMobile ? 0.3 : 0.4),
+                delay: index * (isMobile ? 3 : 4),
                 ease: "easeOut"
               }}
               style={{
                 position: 'absolute',
                 width: `${getSize(agentBackgroundSize)}px`,
                 height: `${getSize(agentBackgroundSize)}px`,
-                background: `conic-gradient(from 0deg at 100% 50%, ${agentEmotionColors[0]} 0deg, transparent 180deg)`,
+                clipPath: 'inset(0 0 0 50%)',
+                background: `conic-gradient(
+                  from 0deg at 50% 50%, 
+                  transparent 0deg,
+                  ${agentEmotionColors[0]} 90deg,
+                  ${agentEmotionColors[1] || agentEmotionColors[0]} 135deg,
+                  ${agentEmotionColors[2] || agentEmotionColors[1] || agentEmotionColors[0]} 160deg,
+                  transparent 180deg,
+                  transparent 360deg
+                )`,
                 borderRadius: '50%',
-                opacity: 1,
+                opacity: 0.9,
                 filter: 'blur(2px)',
-                zIndex: 100,
+                zIndex: 999,
                 mixBlendMode: 'normal',
+                border: '1px solid rgba(255, 255, 255, 0.3)',
+                boxShadow: `
+                  inset 0 0 50px 20px rgba(255, 255, 255, 0.2),
+                  0 0 ${isMobile ? '50px 25px' : '70px 35px'} rgba(255, 255, 255, 0.15)
+                `,
               }}
             />
           ))}
@@ -318,8 +389,8 @@ const Messages = forwardRef<
       >
         <motion.div
           animate={{
-            width: userBackgroundSize,
-            height: userBackgroundSize,
+            width: `${standardHeight}px`,  // 使用标准高度
+            height: `${standardHeight}px`, // 使用标准高度
             background: `
               radial-gradient(
                 circle at center,
@@ -355,63 +426,93 @@ const Messages = forwardRef<
         />
       </motion.div>
 
-      {/* 消息列表容器 */}
+      {/* 可滚动的消息列表容器 */}
       <motion.div
         className={cn(
-          "max-w-2xl mx-auto w-full flex flex-col gap-2 md:gap-4 pb-24", // 调整间距
-          "h-auto",
+          "w-full",
+          "relative z-10",
           "overflow-y-auto",
-          "relative z-10"
+          "overflow-x-visible",
+          "h-[calc(100vh-4rem)]",
+          "scrollbar-thin",
+          "scrollbar-thumb-gray-200",
+          "scrollbar-track-transparent hover:scrollbar-thumb-gray-300",
+          "pb-24",
+          "px-[300px] md:px-[400px]"
         )}
       >
-        <AnimatePresence mode="popLayout">
-          {messages.map((msg, index) => {
-            if (msg.type === "user_message" || msg.type === "assistant_message") {
-              const messageKey = msg.type + index;
-              const position = messagePositions.current[messageKey];
+        <div 
+          className="relative w-full" 
+          style={{
+            minHeight: `${messages.length * standardHeight * 1.1 + window.innerHeight}px`
+          }}
+        >
+          <AnimatePresence mode="popLayout">
+            {messages.map((msg, index) => {
+              if (msg.type === "user_message" || msg.type === "assistant_message") {
+                const messageKey = msg.type + index;
+                const position = getMessagePosition(index, msg.type, scrollY);
 
-              if (!visibleMessages[messageKey] || !position || !('message' in msg)) return null;
+                if (!visibleMessages[messageKey] || !position || !('message' in msg)) return null;
 
-              return (
-                <motion.div
-                  key={msg.type + index}
-                  className={cn(
-                    "w-[200px] sm:w-[260px] md:w-[300px]", // 调整消息宽度
-                    "bg-card",
-                    "border border-border rounded-lg",
-                    "pointer-events-auto"
-                  )}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  style={{
-                    position: 'absolute',
-                    left: position.x,
-                    top: position.y,
-                    zIndex: 1000,
-                    maxWidth: '80%',
-                  }}
-                >
-                  <div className={cn(
-                    "text-xs capitalize font-medium leading-none opacity-50 pt-3 px-2 md:pt-4 md:px-3" // 调整内边距
-                  )}>
-                    {msg.message.role}
-                  </div>
-                  
-                  <div className={"pb-2 px-2 md:pb-3 md:px-3"}> {/* 调整内边距 */}
-                    {msg.message.content}
-                  </div>
-                  
-                  <Expressions values={{ ...msg.models.prosody?.scores }} />
-                </motion.div>
-              );
-            }
-            return null;
-          })}
-        </AnimatePresence>
+                return (
+                  <motion.div
+                    key={msg.type + index}
+                    className={cn(
+                      "w-[200px] sm:w-[260px] md:w-[300px]",
+                      "bg-white dark:bg-zinc-800",
+                      "border border-border rounded-lg",
+                      "pointer-events-auto",
+                      "shadow-lg",
+                      msg.type === "assistant_message" ? "mr-auto" : "ml-auto"
+                    )}
+                    initial={{ 
+                      opacity: 0,
+                      y: position.y + 50,
+                      x: position.x
+                    }}
+                    animate={{ 
+                      opacity: 1,
+                      y: position.y,
+                      x: position.x
+                    }}
+                    exit={{ 
+                      opacity: 0,
+                      y: position.y - 100,
+                      transition: { duration: 0.5 }
+                    }}
+                    transition={{
+                      duration: 0.5,
+                      ease: "easeOut"
+                    }}
+                    style={{
+                      position: 'absolute',
+                      height: `${standardHeight}px`,
+                      maxWidth: '80%',
+                      zIndex: 1000 - (messages.length - index),
+                    }}
+                  >
+                    <div className={cn(
+                      "text-xs capitalize font-medium leading-none opacity-50 pt-3 px-2 md:pt-4 md:px-3"
+                    )}>
+                      {msg.message.role}
+                    </div>
+                    
+                    <div className="pb-2 px-2 md:pb-3 md:px-3">
+                      {msg.message.content}
+                    </div>
+                    
+                    <Expressions values={{ ...msg.models.prosody?.scores }} />
+                  </motion.div>
+                );
+              }
+              return null;
+            })}
+          </AnimatePresence>
+        </div>
       </motion.div>
 
-      {/* 音量指示器 */}
+      {/* 音量指示器保持在底部固定位置 */}
       {status.value === "connected" && (
         <>
           {/* Agent音量显示 */}
