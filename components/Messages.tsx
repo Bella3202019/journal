@@ -202,11 +202,11 @@ const Messages = forwardRef<
     }
   };
 
-  // 计算圆球大小
+  // 统一圆形大小的基础值
   const getCircleSize = () => {
     const viewportHeight = window.innerHeight;
-    const baseSize = viewportHeight * 0.5; // 50% 的视口高度
-    return window.innerWidth < 768 ? baseSize * 0.8 : baseSize; // 移动端稍微缩小
+    const baseSize = isMobile ? 174 : 174; // 固定基础大小与 SVG viewBox 一致
+    return baseSize;
   };
 
   // 更新状态定义
@@ -215,12 +215,15 @@ const Messages = forwardRef<
     setAgentBackgroundSize(getCircleSize());
   }, []);
 
-  // 计算用户音量
+  // 计算用户音量并更新圆的大小
   useEffect(() => {
     if (micFft) {
-      const volume = micFft.reduce((a, b) => a + b, 0) / micFft.length;
-      const normalizedVolume = Math.min(100, Math.max(0, volume * 100));
-      setUserBackgroundSize(getCircleSize() + normalizedVolume * 2);
+      const volume = micFft.reduce((a, b) => a + b, 0);
+      const baseSize = getCircleSize();
+      const scale = Math.min(2, 1 + (volume * 2)); // 限制最大缩放为2倍
+      setUserBackgroundSize(baseSize * scale);
+    } else {
+      setUserBackgroundSize(getCircleSize());
     }
   }, [micFft]);
 
@@ -254,9 +257,19 @@ const Messages = forwardRef<
           .slice(0, 3)
           .map(([emotion]) => emotionColorMap[emotion as keyof typeof emotionColorMap] || "#4169E1");
         setAgentEmotionColors(sortedEmotions);
+        
+        // 当 agent 开始说话时
+        if (isPlaying && !isAgentSpeaking) {
+          setIsAgentSpeaking(true);
+        }
+      }
+      
+      // 当 agent 停止说话时
+      if (!isPlaying && isAgentSpeaking) {
+        setIsAgentSpeaking(false);
       }
     }
-  }, [messages, micFft]);
+  }, [messages, isPlaying, isAgentSpeaking]);
 
   // 获取 Agent 状态
   const getAgentStatus = () => {
@@ -301,34 +314,97 @@ const Messages = forwardRef<
           zIndex: 1000,
         }}
       >
-        {/* 内部实心渐变圆 */}
+        {/* 内部实心渐变圆 - 使用 SVG */}
         <motion.div
           style={{
             position: 'absolute',
-            width: `${standardHeight}px`,  // 使用标准高度
-            height: `${standardHeight}px`, // 使用标准高度
+            width: `${standardHeight}px`,
+            height: `${standardHeight}px`,
             clipPath: 'inset(0 0 0 50%)',
-            background: `
-              radial-gradient(
-                circle at center,
-                ${agentEmotionColors[0]} 0%,
-                transparent 70%
-              ),
-              conic-gradient(
-                from 0deg at center,
-                ${agentEmotionColors[1] || agentEmotionColors[0]} 0deg,
-                ${agentEmotionColors[2] || agentEmotionColors[1] || agentEmotionColors[0]} 120deg,
-                ${agentEmotionColors[0]} 240deg,
-                ${agentEmotionColors[1] || agentEmotionColors[0]} 360deg
-              )
-            `,
-            borderRadius: '50%',
-            opacity: 0.9,
-            filter: 'blur(2px)',
             zIndex: 1000,
-            border: 'none',
           }}
-        />
+        >
+          <svg width="100%" height="100%" viewBox="0 0 174 174" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <g clipPath="url(#agentClip)">
+              <g filter="url(#agentBlur)">
+                <circle 
+                  cx="87" 
+                  cy="87" 
+                  r="87" 
+                  fill={`url(#agentGradient)`}
+                />
+              </g>
+              {/* 添加一个额外的发光效果 */}
+              <g filter="url(#agentGlow)">
+                <circle 
+                  cx="87" 
+                  cy="87" 
+                  r="60" 
+                  fill={`url(#agentInnerGradient)`}
+                  style={{
+                    opacity: isPlaying ? 0.8 : 0.4,
+                    transition: 'opacity 0.3s ease'
+                  }}
+                />
+              </g>
+            </g>
+            <defs>
+              <filter
+                id="agentBlur"
+                x="-36"
+                y="-36"
+                width="246"
+                height="246"
+                filterUnits="userSpaceOnUse"
+                colorInterpolationFilters="sRGB"
+              >
+                <feFlood floodOpacity="0" result="BackgroundImageFix" />
+                <feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape" />
+                <feGaussianBlur stdDeviation="18" result="effect1_foregroundBlur" />
+              </filter>
+              <filter
+                id="agentGlow"
+                x="-10"
+                y="-10"
+                width="194"
+                height="194"
+                filterUnits="userSpaceOnUse"
+                colorInterpolationFilters="sRGB"
+              >
+                <feFlood floodOpacity="0" result="BackgroundImageFix" />
+                <feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape" />
+                <feGaussianBlur stdDeviation="8" result="effect1_foregroundBlur" />
+              </filter>
+              <radialGradient
+                id="agentGradient"
+                cx="0"
+                cy="0"
+                r="1"
+                gradientUnits="userSpaceOnUse"
+                gradientTransform="translate(87 87) rotate(90) scale(87)"
+              >
+                <stop offset="0%" stopColor={agentEmotionColors[0]} stopOpacity="0.9" />
+                <stop offset="50%" stopColor={agentEmotionColors[1] || agentEmotionColors[0]} stopOpacity="0.6" />
+                <stop offset="100%" stopColor={agentEmotionColors[2] || agentEmotionColors[0]} stopOpacity="0" />
+              </radialGradient>
+              <radialGradient
+                id="agentInnerGradient"
+                cx="0"
+                cy="0"
+                r="1"
+                gradientUnits="userSpaceOnUse"
+                gradientTransform="translate(87 87) rotate(-45) scale(60)"
+              >
+                <stop offset="0%" stopColor={agentEmotionColors[0]} stopOpacity="0.95" />
+                <stop offset="40%" stopColor={agentEmotionColors[1] || agentEmotionColors[0]} stopOpacity="0.8" />
+                <stop offset="100%" stopColor={agentEmotionColors[2] || agentEmotionColors[0]} stopOpacity="0" />
+              </radialGradient>
+              <clipPath id="agentClip">
+                <circle cx="87" cy="87" r="87" />
+              </clipPath>
+            </defs>
+          </svg>
+        </motion.div>
 
         {/* 外部水波纹 */}
         <>
@@ -361,7 +437,7 @@ const Messages = forwardRef<
                   transparent 360deg
                 )`,
                 borderRadius: '50%',
-                opacity: 0.9,
+                opacity: isPlaying ? 0.9 : 0.5, // 说话时更明显
                 filter: 'blur(2px)',
                 zIndex: 999,
                 mixBlendMode: 'normal',
@@ -376,7 +452,7 @@ const Messages = forwardRef<
         </>
       </motion.div>
 
-      {/* User的背景圆球 */}
+      {/* User的背景圆 */}
       <motion.div
         className="fixed pointer-events-none flex items-center justify-center"
         style={{
@@ -387,43 +463,97 @@ const Messages = forwardRef<
           zIndex: 100,
         }}
       >
+        {/* 内部实心渐变圆 */}
         <motion.div
-          animate={{
-            width: `${standardHeight}px`,  // 使用标准高度
-            height: `${standardHeight}px`, // 使用标准高度
-            background: `
-              radial-gradient(
-                circle at center,
-                ${userEmotionColors[0]} 0%,
-                transparent 70%
-              ),
-              conic-gradient(
-                from 0deg at center,
-                ${userEmotionColors[1] || userEmotionColors[0]} 0deg,
-                ${userEmotionColors[2] || userEmotionColors[1] || userEmotionColors[0]} 120deg,
-                ${userEmotionColors[0]} 240deg,
-                ${userEmotionColors[1] || userEmotionColors[0]} 360deg
-              )
-            `,
-            scale: [1, 1.02, 1],
-          }}
-          transition={{
-            duration: isMobile ? 4 : 6,
-            repeat: Infinity,
-            ease: "easeInOut"
-          }}
-          className="rounded-full"
           style={{
-            opacity: 0.8,
-            filter: 'blur(3px)',
-            boxShadow: `
-              inset 0 0 50px 20px rgba(255, 255, 255, 0.2),
-              0 0 ${isMobile ? '50px 25px' : '70px 35px'} rgba(255, 255, 255, 0.15)
-            `,
-            mixBlendMode: 'normal',
-            backdropFilter: 'blur(5px)',
+            position: 'absolute',
+            width: `${userBackgroundSize}px`,
+            height: `${userBackgroundSize}px`,
+            zIndex: 1000,
+            transition: 'width 0.2s ease-out, height 0.2s ease-out'
           }}
-        />
+        >
+          <svg width="100%" height="100%" viewBox="0 0 174 174" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <g clipPath="url(#userClip)">
+              <g filter="url(#userBlur)">
+                <circle 
+                  cx="87" 
+                  cy="87" 
+                  r="87" 
+                  fill={`url(#userGradient)`}
+                />
+              </g>
+              {/* 添加内部发光效果 */}
+              <g filter="url(#userGlow)">
+                <circle 
+                  cx="87" 
+                  cy="87" 
+                  r="60" 
+                  fill={`url(#userInnerGradient)`}
+                  style={{
+                    opacity: micFft && micFft.reduce((a, b) => a + b, 0) > 0.05 ? 0.9 : 0.4, // 增加说话时的不透明度
+                    transition: 'opacity 0.15s ease' // 加快透明度变化
+                  }}
+                />
+              </g>
+            </g>
+            <defs>
+              <filter
+                id="userBlur"
+                x="-36"
+                y="-36"
+                width="246"
+                height="246"
+                filterUnits="userSpaceOnUse"
+                colorInterpolationFilters="sRGB"
+              >
+                <feFlood floodOpacity="0" result="BackgroundImageFix" />
+                <feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape" />
+                <feGaussianBlur stdDeviation="18" result="effect1_foregroundBlur" />
+              </filter>
+              <filter
+                id="userGlow"
+                x="-10"
+                y="-10"
+                width="194"
+                height="194"
+                filterUnits="userSpaceOnUse"
+                colorInterpolationFilters="sRGB"
+              >
+                <feFlood floodOpacity="0" result="BackgroundImageFix" />
+                <feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape" />
+                <feGaussianBlur stdDeviation="8" result="effect1_foregroundBlur" />
+              </filter>
+              <radialGradient
+                id="userGradient"
+                cx="0"
+                cy="0"
+                r="1"
+                gradientUnits="userSpaceOnUse"
+                gradientTransform="translate(87 87) rotate(90) scale(87)"
+              >
+                <stop offset="0%" stopColor={userEmotionColors[0]} stopOpacity="0.9" />
+                <stop offset="50%" stopColor={userEmotionColors[1] || userEmotionColors[0]} stopOpacity="0.6" />
+                <stop offset="100%" stopColor={userEmotionColors[2] || userEmotionColors[0]} stopOpacity="0" />
+              </radialGradient>
+              <radialGradient
+                id="userInnerGradient"
+                cx="0"
+                cy="0"
+                r="1"
+                gradientUnits="userSpaceOnUse"
+                gradientTransform="translate(87 87) rotate(-45) scale(60)"
+              >
+                <stop offset="0%" stopColor={userEmotionColors[0]} stopOpacity="0.95" />
+                <stop offset="40%" stopColor={userEmotionColors[1] || userEmotionColors[0]} stopOpacity="0.8" />
+                <stop offset="100%" stopColor={userEmotionColors[2] || userEmotionColors[0]} stopOpacity="0" />
+              </radialGradient>
+              <clipPath id="userClip">
+                <circle cx="87" cy="87" r="87" />
+              </clipPath>
+            </defs>
+          </svg>
+        </motion.div>
       </motion.div>
 
       {/* 可滚动的消息列表容器 */}
