@@ -2,12 +2,15 @@ import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { ServiceAccount } from 'firebase-admin';
 
-// 导入服务账号密钥
-const serviceAccount = require('../firebase-admin-key.json');
-
 if (!getApps().length) {
+  const serviceAccount: ServiceAccount = {
+    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID!,
+    clientEmail: process.env.FIREBASE_CLIENT_EMAIL!,
+    privateKey: process.env.FIREBASE_PRIVATE_KEY!
+  };
+
   initializeApp({
-    credential: cert(serviceAccount as ServiceAccount)
+    credential: cert(serviceAccount)
   });
 }
 

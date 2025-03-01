@@ -3,7 +3,7 @@ import { cn } from "@/utils";
 import { useVoice } from "@humeai/voice-react";
 import Expressions from "./Expressions";
 import { AnimatePresence, motion } from "framer-motion";
-import { ComponentRef, forwardRef, useEffect, useState, useRef } from "react";
+import { ComponentRef, forwardRef, useEffect, useState, useRef, useCallback } from "react";
 
 // 定义情绪颜色映射的类型
 type EmotionColorMap = {
@@ -90,6 +90,8 @@ const Messages = forwardRef<
   const [userEmotionColors, setUserEmotionColors] = useState<string[]>(["#4169E1", "#87CEEB", "#B0C4DE"]);
   const [agentEmotionColors, setAgentEmotionColors] = useState<string[]>(["#4169E1", "#87CEEB", "#B0C4DE"]);
   const [isAgentSpeaking, setIsAgentSpeaking] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   
   useEffect(() => {
     const handleScroll = () => {
@@ -178,6 +180,7 @@ const Messages = forwardRef<
   // 在 Messages 组件内部定义统一的高度
   const standardHeight = 150; // 消息框的标准高度
 
+  // 修改消息位置计算函数
   const getMessagePosition = (index: number, type: string, scrollY: number) => {
     const waveCenter = {
       x: isMobile ? window.innerWidth * 0.5 : window.innerWidth * 0.25,
@@ -285,13 +288,42 @@ const Messages = forwardRef<
   // 在渲染前添加调试日志
   console.log('Agent emotion colors:', agentEmotionColors);
 
+  // 改进的滚动函数
+  const scrollToCenter = useCallback((messageIndex: number) => {
+    if (scrollContainerRef.current) {
+      const container = scrollContainerRef.current;
+      const containerHeight = container.clientHeight;
+      const messageHeight = standardHeight * 1.1; // 考虑间距
+      
+      // 计算目标滚动位置（使最新消息在中心）
+      const targetScroll = (messageIndex * messageHeight) - (containerHeight / 2) + (messageHeight / 2);
+      
+      container.scrollTo({
+        top: Math.max(0, targetScroll),
+        behavior: 'smooth',
+        // @ts-ignore
+        duration: 1000 // 1秒的滚动动画
+      });
+    }
+  }, []);
+
+  // 监听新消息
+  useEffect(() => {
+    if (messages.length > 0) {
+      const lastMessageIndex = messages.length - 1;
+      setTimeout(() => {
+        scrollToCenter(lastMessageIndex);
+      }, 100);
+    }
+  }, [messages.length, scrollToCenter]);
+
   return (
     <motion.div
       layoutScroll
       className={cn(
         "grow rounded-md p-2 md:p-4",
         "relative",
-        "bg-white",
+        "bg-white dark:bg-black",
         "w-full",
         "overflow-x-hidden"
       )}
@@ -312,6 +344,7 @@ const Messages = forwardRef<
           alignItems: 'center',
           justifyContent: 'center',
           zIndex: 1000,
+          background: 'var(--background)',
         }}
       >
         {/* 内部实心渐变圆 - 使用 SVG */}
@@ -461,6 +494,7 @@ const Messages = forwardRef<
           top: '50%',
           marginTop: '0',
           zIndex: 100,
+          background: 'var(--background)',
         }}
       >
         {/* 内部实心渐变圆 */}
@@ -558,6 +592,7 @@ const Messages = forwardRef<
 
       {/* 可滚动的消息列表容器 */}
       <motion.div
+        ref={scrollContainerRef}
         className={cn(
           "w-full",
           "relative z-10",
@@ -565,16 +600,22 @@ const Messages = forwardRef<
           "overflow-x-visible",
           "h-[calc(100vh-4rem)]",
           "scrollbar-thin",
-          "scrollbar-thumb-gray-200",
-          "scrollbar-track-transparent hover:scrollbar-thumb-gray-300",
+          "scrollbar-thumb-gray-200 dark:scrollbar-thumb-gray-700",
+          "scrollbar-track-transparent hover:scrollbar-thumb-gray-300 dark:hover:scrollbar-thumb-gray-600",
           "pb-24",
-          "px-[300px] md:px-[400px]"
+          "px-[300px] md:px-[400px]",
+          "bg-white dark:bg-black"
         )}
+        style={{
+          scrollBehavior: 'smooth'
+        }}
       >
         <div 
           className="relative w-full" 
           style={{
-            minHeight: `${messages.length * standardHeight * 1.1 + window.innerHeight}px`
+            minHeight: `${messages.length * standardHeight * 1.1 + window.innerHeight}px`,
+            paddingTop: `${window.innerHeight / 2}px`, // 顶部填充
+            paddingBottom: `${window.innerHeight / 2}px` // 底部填充
           }}
         >
           <AnimatePresence mode="popLayout">
@@ -587,13 +628,14 @@ const Messages = forwardRef<
 
                 return (
                   <motion.div
-                    key={msg.type + index}
+                    key={messageKey}
                     className={cn(
                       "w-[200px] sm:w-[260px] md:w-[300px]",
-                      "bg-white dark:bg-zinc-800",
-                      "border border-border rounded-lg",
+                      "bg-white dark:bg-black",
+                      "border border-border dark:border-gray-800",
+                      "rounded-lg",
                       "pointer-events-auto",
-                      "shadow-lg",
+                      "shadow-lg dark:shadow-none",
                       msg.type === "assistant_message" ? "mr-auto" : "ml-auto"
                     )}
                     initial={{ 
@@ -639,6 +681,7 @@ const Messages = forwardRef<
               return null;
             })}
           </AnimatePresence>
+          <div ref={messagesEndRef} style={{ height: '1px' }} />
         </div>
       </motion.div>
 
@@ -647,7 +690,7 @@ const Messages = forwardRef<
         <>
           {/* Agent音量显示 */}
           <div 
-            className="fixed bottom-2 md:bottom-4 px-2 md:px-4 py-1 md:py-2 rounded-md"
+            className="fixed bottom-2 md:bottom-4 px-2 md:px-4 py-1 md:py-2 rounded-md bg-white dark:bg-black"
             style={{ 
               zIndex: 1000,
               left: isMobile ? '25%' : '25%',
@@ -680,7 +723,7 @@ const Messages = forwardRef<
 
           {/* User音量显示 */}
           <div 
-            className="fixed bottom-2 md:bottom-4 px-2 md:px-4 py-1 md:py-2 rounded-md"
+            className="fixed bottom-2 md:bottom-4 px-2 md:px-4 py-1 md:py-2 rounded-md bg-white dark:bg-black"
             style={{ 
               zIndex: 1000,
               right: isMobile ? '25%' : '25%',
