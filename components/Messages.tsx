@@ -12,66 +12,66 @@ type EmotionColorMap = {
 
 // 情绪对应的颜色映射
 const emotionColorMap: EmotionColorMap = {
-  // 积极情绪 - 绿色系和暖色系
-  Admiration: "#32CD32",       // 酸橙绿
-  Adoration: "#98FB98",        // 淡绿
-  "Aesthetic Appreciation": "#90EE90", // 淡绿
-  Amusement: "#7FFF00",        // 查特兰绿
-  Approval: "#00FF7F",         // 春绿
-  Caring: "#FFB6C1",          // 浅粉红
-  Calmness: "#98FB98",         // 淡绿
-  Contentment: "#3CB371",      // 中海绿
-  Determination: "#2E8B57",    // 海绿
-  Ecstasy: "#00FA9A",         // 中春绿
-  Enthusiasm: "#66CDAA",       // 中绿宝石
-  Excitement: "#43CD80",       // 海绿
-  Gratitude: "#9ACD32",        // 黄绿
-  Interest: "#6B8E23",        // 橄榄绿
-  Joy: "#228B22",             // 森林绿
-  Love: "#FFB6C1",            // 浅粉红
-  Optimism: "#98FB98",        // 淡绿
-  Pride: "#20B2AA",           // 亮海绿
-  Relief: "#90EE90",          // 淡绿
-  Romance: "#FF69B4",         // 热粉红
-  Satisfaction: "#32CD32",     // 酸橙绿
-  "Surprise (positive)": "#7CCD7C", // 中绿
-  Triumph: "#00FF00",         // 酸橙色
+  // 积极情绪
+  Admiration: "#f4a261",      // 珊瑚橙
+  Adoration: "#90be6d",       // 柔和绿
+  "Aesthetic Appreciation": "#f4e285", // 淡金黄
+  Amusement: "#f4a261",       // 珊瑚橙
+  Approval: "#f3722c",        // 燃烧橙
+  Caring: "#43aa8b",          // 青绿
+  Calmness: "#2a9d8f",        // 深青绿
+  Contentment: "#43aa8b",     // 青绿
+  Determination: "#e63946",    // 鲜红
+  Ecstasy: "#f94144",         // 亮红
+  Enthusiasm: "#f4a261",      // 珊瑚橙
+  Excitement: "#d62828",      // 深红
+  Gratitude: "#f4e285",       // 淡金黄
+  Interest: "#0077b6",        // 深蓝
+  Joy: "#f4a261",            // 珊瑚橙
+  Love: "#e76f51",           // 赤陶红
+  Optimism: "#f4e285",       // 淡金黄
+  Pride: "#e63946",          // 鲜红
+  Relief: "#2a9d8f",         // 深青绿
+  Romance: "#e76f51",        // 赤陶红
+  Satisfaction: "#43aa8b",    // 青绿
+  "Surprise (positive)": "#f94144", // 亮红
+  Triumph: "#e63946",        // 鲜红
 
-  // 中性情绪 - 蓝色系
-  Concentration: "#4682B4",    // 钢蓝
-  Contemplation: "#87CEEB",    // 天蓝
-  Craving: "#B0C4DE",         // 淡钢蓝
-  Curiosity: "#1E90FF",       // 道奇蓝
-  Desire: "#ADD8E6",          // 亮蓝
-  Nostalgia: "#87CEFA",       // 亮天蓝
-  Realization: "#00BFFF",      // 深天蓝
-  Sympathy: "#4169E1",        // 皇家蓝
+  // 中性情绪
+  Concentration: "#264653",   // 深青灰
+  Contemplation: "#264653",   // 深青灰
+  Craving: "#f3722c",        // 燃烧橙
+  Curiosity: "#0077b6",      // 深蓝
+  Desire: "#e76f51",         // 赤陶红
+  Nostalgia: "#a7c957",      // 橄榄绿
+  Realization: "#577590",    // 钢青蓝
+  Sympathy: "#a7c957",       // 橄榄绿
 
-  // 消极情绪 - 红色、灰色和深色系
-  Anger: "#DC143C",           // 猩红
-  Annoyance: "#CD5C5C",       // 印度红
-  Anxiety: "#8B0000",         // 暗红
-  Awkwardness: "#A0522D",     // 赭色
-  Boredom: "#808080",         // 灰色
-  Confusion: "#DEB887",       // 实木色
-  Contempt: "#8B4513",        // 马鞍棕
-  Disappointment: "#CD853F",   // 秘鲁色
-  Disapproval: "#B22222",      // 火砖红
-  Disgust: "#8B4513",         // 马鞍棕
-  Distress: "#DC143C",        // 猩红
-  Doubt: "#696969",           // 暗灰
-  Embarrassment: "#DEB887",    // 实木色
-  "Empathic Pain": "#800000",  // 栗色
-  Envy: "#556B2F",            // 暗橄榄绿
-  Fear: "#800000",            // 栗色
-  Guilt: "#2F4F4F",           // 暗岩灰
-  Horror: "#8B0000",          // 暗红
-  Pain: "#A52A2A",            // 褐色
-  Sadness: "#4682B4",         // 钢蓝
-  Shame: "#8B4513",           // 马鞍棕
-  "Surprise (negative)": "#DC143C", // 猩红
-  Tiredness: "#778899",       // 亮灰
-  Yearning: "#DEB887",        // 实木色
+  // 消极情绪
+  Anger: "#d62828",          // 深红
+  Annoyance: "#f3722c",      // 燃烧橙
+  Anxiety: "#6a0572",        // 深紫
+  Awkwardness: "#6a0572",    // 深紫
+  Boredom: "#577590",        // 钢青蓝
+  Confusion: "#6a0572",      // 深紫
+  Contempt: "#6a0572",       // 深紫
+  Disappointment: "#a7c957",  // 橄榄绿
+  Disapproval: "#6a0572",    // 深紫
+  Disgust: "#6a0572",        // 深紫
+  Distress: "#d62828",       // 深红
+  Doubt: "#6a0572",          // 深紫
+  Embarrassment: "#f94144",   // 亮红
+  "Empathic Pain": "#d62828", // 深红
+  Envy: "#0077b6",           // 深蓝
+  Fear: "#d62828",           // 深红
+  Guilt: "#264653",          // 深青灰
+  Horror: "#d62828",         // 深红
+  Pain: "#e63946",           // 鲜红
+  Sadness: "#577590",        // 钢青蓝
+  Shame: "#6a0572",          // 深紫
+  "Surprise (negative)": "#f94144", // 亮红
+  Tiredness: "#577590",      // 钢青蓝
+  Yearning: "#f3722c"        // 燃烧橙
 };
 
 // 添加响应式布局的辅助函数
@@ -367,7 +367,7 @@ const Messages = forwardRef<
                   fill={`url(#agentGradient)`}
                 />
               </g>
-              {/* 添加一个额外的发光效果 */}
+              {/* 添加一个额外的发光效果，移除了外框 */}
               <g filter="url(#agentGlow)">
                 <circle 
                   cx="87" 
@@ -470,11 +470,10 @@ const Messages = forwardRef<
                   transparent 360deg
                 )`,
                 borderRadius: '50%',
-                opacity: isPlaying ? 0.9 : 0.5, // 说话时更明显
+                opacity: isPlaying ? 0.9 : 0.5,
                 filter: 'blur(2px)',
                 zIndex: 999,
                 mixBlendMode: 'normal',
-                border: '1px solid rgba(255, 255, 255, 0.3)',
                 boxShadow: `
                   inset 0 0 50px 20px rgba(255, 255, 255, 0.2),
                   0 0 ${isMobile ? '50px 25px' : '70px 35px'} rgba(255, 255, 255, 0.15)
