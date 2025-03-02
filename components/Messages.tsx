@@ -86,6 +86,26 @@ const emotionColorMap: EmotionColorMap = {
 // 添加响应式布局的辅助函数
 const isMobile = typeof window !== 'undefined' ? window.innerWidth < 768 : false;
 
+// 在文件顶部添加类型定义
+type ProsodyScores = {
+  [emotion: string]: number;
+};
+
+type MessageModels = {
+  prosody?: {
+    scores: ProsodyScores;
+  };
+};
+
+interface BaseMessage {
+  type: string;
+  message?: {
+    role: string;
+    content: string;
+  };
+  models?: MessageModels;
+}
+
 const Messages = forwardRef<
   ComponentRef<typeof motion.div>,
   Record<never, never>
@@ -251,53 +271,29 @@ const Messages = forwardRef<
 
   // 更新情绪颜色
   useEffect(() => {
-    const latestMessage = messages[messages.length - 1];
+    const latestMessage = messages[messages.length - 1] as BaseMessage;
     
-    if (latestMessage?.type === "user_message") {
-      const scores = latestMessage.models?.prosody?.scores;
-      if (scores) {
-        // 获取前三个最强的情绪及其对应的颜色
-        const sortedEmotions = Object.entries(scores)
-          .sort(([, a], [, b]) => b - a)  // 按分数降序排序
-          .slice(0, 3)  // 只取前三个
-          .map(([emotion]) => {
-            // 确保从 emotionColorMap 中获取到颜色
-            const color = emotionColorMap[emotion];
-            console.log('User emotion:', emotion, 'color:', color); // 调试日志
-            return color || "#4169E1"; // 如果没找到颜色则使用默认蓝色
-          });
-        
-        console.log('Updated user emotion colors:', sortedEmotions); // 调试日志
-        setUserEmotionColors(sortedEmotions);
-      }
-    } else if (latestMessage?.type === "assistant_message") {
-      const scores = latestMessage.models?.prosody?.scores;
-      if (scores) {
-        const sortedEmotions = Object.entries(scores)
-          .sort(([, a], [, b]) => b - a)  // 按分数降序排序
-          .slice(0, 3)  // 只取前三个
-          .map(([emotion]) => {
-            // 确保从 emotionColorMap 中获取到颜色
-            const color = emotionColorMap[emotion];
-            console.log('Agent emotion:', emotion, 'color:', color); // 调试日志
-            return color || "#43aa8b"; // 如果没找到颜色则使用默认青绿色
-          });
-        
-        console.log('Updated agent emotion colors:', sortedEmotions); // 调试日志
-        setAgentEmotionColors(sortedEmotions);
-        
-        // 当 agent 开始说话时
-        if (isPlaying && !isAgentSpeaking) {
-          setIsAgentSpeaking(true);
-        }
-      }
-      
-      // 当 agent 停止说话时
-      if (!isPlaying && isAgentSpeaking) {
-        setIsAgentSpeaking(false);
-      }
+    if (!latestMessage || !latestMessage.models?.prosody?.scores) {
+      return;
     }
-  }, [messages, isPlaying, isAgentSpeaking]);
+
+    const emotionScores = latestMessage.models.prosody.scores;
+    
+    const topThreeColors = Object.entries(emotionScores)
+      .sort(([, scoreA], [, scoreB]) => scoreB - scoreA)
+      .slice(0, 3)
+      .map(([emotion]) => {
+        const color = emotionColorMap[emotion];
+        return color || (latestMessage.type === "user_message" ? "#4169E1" : "#43aa8b");
+      });
+
+    if (latestMessage.type === "user_message") {
+      setUserEmotionColors(topThreeColors);
+    } else if (latestMessage.type === "assistant_message") {
+      setAgentEmotionColors(topThreeColors);
+    }
+
+  }, [messages]);
 
   // 获取 Agent 状态
   const getAgentStatus = () => {
@@ -309,9 +305,6 @@ const Messages = forwardRef<
   // 添加响应式布局的辅助函数
   const getSize = (desktopSize: number, mobileRatio = 0.6) => 
     isMobile ? desktopSize * mobileRatio : desktopSize;
-
-  // 在渲染前添加调试日志
-  console.log('Agent emotion colors:', agentEmotionColors);
 
   // 改进的滚动函数
   const scrollToCenter = useCallback((messageIndex: number) => {
@@ -507,9 +500,9 @@ const Messages = forwardRef<
                     const angle = (i * Math.PI * 2) / 40;
                     // 创建多层次的波浪效果
                     const baseRadius = 75;
-                    const wave1 = Math.sin(angle * 8 + Date.now() / 1000) * 6;
-                    const wave2 = Math.sin(angle * 12 + Date.now() / 800) * 4;
-                    const wave3 = Math.sin(angle * 6 + Date.now() / 1200) * 3;
+                    const wave1 = Math.sin(angle * 8 + Date.now() / 1000) * 9;
+                    const wave2 = Math.sin(angle * 12 + Date.now() / 800) * 6;
+                    const wave3 = Math.sin(angle * 6 + Date.now() / 1200) * 4;
                     const variance = wave1 + wave2 + wave3;
                     
                     const x = Math.cos(angle) * (baseRadius + variance);
@@ -561,7 +554,7 @@ const Messages = forwardRef<
         </>
       </motion.div>
 
-      {/* 问候语 */}
+      {/* Agent状态显示 */}
       <div
         className={cn(
           "fixed text-center pointer-events-none",
@@ -570,15 +563,38 @@ const Messages = forwardRef<
         )}
         style={{
           left: '50%',
-          top: '53%',  // 在 Agent (30%) 和 StartCall (80%) 之间
+          top: '29%',  // 与 Agent 圆形位置对应
           transform: 'translateX(-50%)',
-          fontSize: '1.5rem',
+          fontSize: '1rem',
           fontWeight: 500,
-          zIndex: 999,
+          zIndex: 1100,
+          color: 'rgba(255, 255, 255, 0.8)',  // 增加不透明度
+          textShadow: '0 0 10px rgba(255, 255, 255, 0.3)',  // 添加轻微发光效果
         }}
       >
-        How's your day been?
+        {getAgentStatus()}
       </div>
+
+      {/* 问候语 */}
+      {!status.value.includes("connected") && (  // 当不是通话状态时才显示
+        <div
+          className={cn(
+            "fixed text-center pointer-events-none",
+            "text-black/70 dark:text-white/70",
+            lora.className
+          )}
+          style={{
+            left: '50%',
+            top: '53%',  // 在 Agent (30%) 和 StartCall (80%) 之间
+            transform: 'translateX(-50%)',
+            fontSize: '1.5rem',
+            fontWeight: 500,
+            zIndex: 999,
+          }}
+        >
+          Hey, how's your day been?
+        </div>
+      )}
 
       {/* StartCall Button */}
       <div
@@ -596,39 +612,155 @@ const Messages = forwardRef<
         <StartCall />
       </div>
 
-      {/* User的圆形 - 放在下方且更大 */}
+      {/* User的圆形 */}
       <motion.div
         className="fixed pointer-events-none"
         style={{
           left: '50%',
-          bottom: '-140%',
+          bottom: '-160%',
           transform: 'translateX(-50%)',
-          width: '1600px',
-          height: '1600px',
+          width: '2000px',
+          height: '2000px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           zIndex: 900,
         }}
       >
-        {/* User的圆形渐变和动画效果 */}
-        <motion.div
-          style={{
-            position: 'absolute',
-            width: '100%',
-            height: '100%',
-            background: `conic-gradient(
-              ${userEmotionColors[0]} 0deg,
-              ${userEmotionColors[1] || userEmotionColors[0]} 90deg,
-              ${userEmotionColors[2] || userEmotionColors[0]} 240deg,
-              ${userEmotionColors[0]} 360deg
-            )`,
-            filter: 'blur(0px)',
-            opacity: 0.7,
-            mixBlendMode: 'soft-light',
-            borderRadius: '50%',
-          }}
-        />
+        {/* 波浪圆形 */}
+        <svg width="100%" height="100%" viewBox="0 0 2000 2000">
+          <defs>
+            <radialGradient id="userGradient">
+              <stop offset="0%" stopColor={userEmotionColors[0]} stopOpacity="0.7" />
+              <stop offset="70%" stopColor={userEmotionColors[1] || userEmotionColors[0]} stopOpacity="0.5" />
+              <stop offset="100%" stopColor={userEmotionColors[2] || userEmotionColors[0]} stopOpacity="0.3" />
+            </radialGradient>
+          </defs>
+          
+          <path
+            d={`
+              M 1000,1000
+              m -800,0
+              ${Array.from({ length: 540 }, (_, i) => {
+                const angle = (i * Math.PI * 2) / 540;
+                const baseRadius = 800;
+                const rawVolume = micFft ? micFft.reduce((a, b) => a + b, 0) / 100 : 0;
+                const volume = Math.min(1, rawVolume * 0.7 + (rawVolume > 0 ? 0.3 : 0));
+                const time = Date.now();
+                
+                // 基础海浪 - 大的波浪运动
+                const oceanWaves = [
+                  Math.sin(angle * 2 + time / 5000) * 3 * (volume * 0.7 + 1),  // 缓慢的主要波浪
+                  Math.sin(angle * 1.5 + time / 4500) * 2.5 * (volume * 0.7 + 1),  // 次要波浪
+                ];
+                
+                // 表面波纹 - 较小的快速波动
+                const ripples = [
+                  Math.sin(angle * 8 + time / 2000) * 0.8 * (volume * 0.7 + 1),
+                  Math.sin(angle * 6 + time / 2200) * 0.6 * (volume * 0.7 + 1),
+                  Math.sin(angle * 10 + time / 1800) * 0.5 * (volume * 0.7 + 1),
+                  Math.sin(angle * 7 + time / 2400) * 0.7 * (volume * 0.7 + 1),
+                  Math.sin(angle * 9 + time / 2100) * 0.4 * (volume * 0.7 + 1),
+                ];
+                
+                const volumeFactor = Math.pow(volume, 1.5);
+                // 音量驱动的波浪 - 模拟涌浪
+                const volumeWaves = volume > 0.2 ? [
+                  Math.sin(angle * 4 + time / 3000 + Math.sin(time / 8000) * 2) * 2 * volumeFactor * 2.5,
+                  Math.sin(angle * 3 + time / 3500 + Math.sin(time / 7000) * 2) * 1.8 * volumeFactor * 2.5,
+                  Math.sin(angle * 5 + time / 3200 + Math.sin(time / 9000) * 2) * 1.6 * volumeFactor * 2.5,
+                ] : [];
+                
+                // 高音量波浪 - 模拟浪花
+                const highVolumeWaves = volume > 0.5 ? [
+                  Math.sin(angle * 12 + time / 1500) * 1.2 * volumeFactor * 3,
+                  Math.sin(angle * 15 + time / 1200) * 1 * volumeFactor * 3,
+                  Math.sin(angle * 14 + time / 1300) * 0.8 * volumeFactor * 3,
+                  // 添加随机性模拟浪花飞溅
+                  Math.sin(angle * 20 + time / 1000) * Math.random() * volumeFactor * 2,
+                ] : [];
+                
+                // 组合所有波浪并添加缓慢的整体起伏
+                const allWaves = [
+                  ...oceanWaves, 
+                  ...ripples, 
+                  ...volumeWaves, 
+                  ...highVolumeWaves
+                ];
+                const variance = allWaves.reduce((sum, wave) => sum + wave, 0) 
+                  + Math.sin(angle * 0.5 + time / 10000) * 5; // 缓慢的整体起伏
+                
+                const x = Math.cos(angle) * (baseRadius + variance);
+                const y = Math.sin(angle) * (baseRadius + variance);
+                return `${i === 0 ? 'M' : 'L'} ${1000 + x},${1000 + y}`;
+              }).join(' ')}
+              Z
+            `}
+            fill="url(#userGradient)"
+            style={{
+              filter: 'blur(2px)',
+              mixBlendMode: 'soft-light',
+            }}
+          >
+            <animate
+              attributeName="d"
+              dur="8s"  // 增加动画时长使海浪更自然
+              repeatCount="indefinite"
+              values={`
+                M 1000,1000
+                m -800,0
+                ${Array.from({ length: 540 }, (_, i) => {
+                  const angle = (i * Math.PI * 2) / 540;
+                  const baseRadius = 800;
+                  const rawVolume = micFft ? micFft.reduce((a, b) => a + b, 0) / 100 : 0;
+                  const volume = Math.min(1, rawVolume * 0.7 + (rawVolume > 0 ? 0.3 : 0));
+                  const time = Date.now();
+                  
+                  const oceanWaves = [
+                    Math.cos(angle * 2 + time / 5000) * 3 * (volume * 0.7 + 1),
+                    Math.cos(angle * 1.5 + time / 4500) * 2.5 * (volume * 0.7 + 1),
+                  ];
+                  
+                  const ripples = [
+                    Math.cos(angle * 8 + time / 2000) * 0.8 * (volume * 0.7 + 1),
+                    Math.cos(angle * 6 + time / 2200) * 0.6 * (volume * 0.7 + 1),
+                    Math.cos(angle * 10 + time / 1800) * 0.5 * (volume * 0.7 + 1),
+                    Math.cos(angle * 7 + time / 2400) * 0.7 * (volume * 0.7 + 1),
+                    Math.cos(angle * 9 + time / 2100) * 0.4 * (volume * 0.7 + 1),
+                  ];
+                  
+                  const volumeFactor = Math.pow(volume, 1.5);
+                  const volumeWaves = volume > 0.2 ? [
+                    Math.cos(angle * 4 + time / 3000 + Math.cos(time / 8000) * 2) * 2 * volumeFactor * 2.5,
+                    Math.cos(angle * 3 + time / 3500 + Math.cos(time / 7000) * 2) * 1.8 * volumeFactor * 2.5,
+                    Math.cos(angle * 5 + time / 3200 + Math.cos(time / 9000) * 2) * 1.6 * volumeFactor * 2.5,
+                  ] : [];
+                  
+                  const highVolumeWaves = volume > 0.5 ? [
+                    Math.cos(angle * 12 + time / 1500) * 1.2 * volumeFactor * 3,
+                    Math.cos(angle * 15 + time / 1200) * 1 * volumeFactor * 3,
+                    Math.cos(angle * 14 + time / 1300) * 0.8 * volumeFactor * 3,
+                    Math.cos(angle * 20 + time / 1000) * Math.random() * volumeFactor * 2,
+                  ] : [];
+                  
+                  const allWaves = [
+                    ...oceanWaves, 
+                    ...ripples, 
+                    ...volumeWaves, 
+                    ...highVolumeWaves
+                  ];
+                  const variance = allWaves.reduce((sum, wave) => sum + wave, 0)
+                    + Math.cos(angle * 0.5 + time / 10000) * 5;
+                  
+                  const x = Math.cos(angle) * (baseRadius + variance);
+                  const y = Math.sin(angle) * (baseRadius + variance);
+                  return `${i === 0 ? 'M' : 'L'} ${1000 + x},${1000 + y}`;
+                }).join(' ')}
+                Z
+              `}
+            />
+          </path>
+        </svg>
       </motion.div>
 
       {/* 可滚动的消息列表容器 */}
@@ -637,12 +769,12 @@ const Messages = forwardRef<
         className={cn(
           "w-full",
           "relative z-10",
-          "overflow-y-auto",
-          "overflow-x-hidden",  // 防止水平滚动
-          "h-screen",  // 改为 h-screen，确保高度正好是视窗高度
+          "overflow-y-auto",  // 改为 auto 以显示滚动条
+          "overflow-x-hidden",
+          "h-screen",
           "scrollbar-thin",
-          "scrollbar-thumb-gray-200 dark:scrollbar-thumb-gray-700",
-          "scrollbar-track-transparent",
+          "scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600", // 调整滚动条颜色
+          "scrollbar-track-gray-100 dark:scrollbar-track-gray-800", // 添加滚动条轨道颜色
           "pb-24",
           "px-[300px] md:px-[400px]",
           "bg-white dark:bg-black",
@@ -650,9 +782,9 @@ const Messages = forwardRef<
         )}
         style={{
           scrollBehavior: 'smooth',
-          height: '100vh',  // 确保高度是视窗高度
-          maxHeight: '100vh',  // 限制最大高度
-          overflowY: 'hidden',  // 默认隐藏滚动条
+          height: '100vh',
+          maxHeight: '100vh',
+          overflowY: 'auto',  // 改为 auto
         }}
       >
         <div 
@@ -731,78 +863,10 @@ const Messages = forwardRef<
         </div>
       </motion.div>
 
-      {/* 音量指示器保持在底部固定位置 */}
+      {/* 移除音量指示器，保留其他内容 */}
       {status.value === "connected" && (
         <>
-          {/* Agent音量显示 */}
-          <div 
-            className="fixed bottom-2 md:bottom-4 px-2 md:px-4 py-1 md:py-2 rounded-md bg-white dark:bg-black"
-            style={{ 
-              zIndex: 1000,
-              left: isMobile ? '25%' : '25%',
-              transform: 'translateX(-50%)',
-              fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif',
-              fontSize: isMobile ? '12px' : '14px',
-              fontWeight: 500,
-            }}
-          >
-            <div>Dela is in {getAgentStatus()}</div>
-            <div className="flex items-center gap-1 md:gap-2 mt-1">
-              <div className="flex gap-0.5">
-                {[...Array(15)].map((_, i) => (
-                  <div
-                    key={i}
-                    className={cn(
-                      "w-0.5 md:w-1",
-                      "h-3 md:h-4"
-                    )}
-                    style={{
-                      backgroundColor: i < (fft ? Math.min(15, Math.floor((fft.reduce((a, b) => a + b, 0) / fft.length) * 15)) : 0) 
-                        ? `rgb(${16 + (i * 4)}, ${185 - (i * 3)}, ${129 - (i * 2)})` 
-                        : '#E5E7EB'
-                    }}
-                  />
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* User音量显示 */}
-          <div 
-            className="fixed bottom-2 md:bottom-4 px-2 md:px-4 py-1 md:py-2 rounded-md bg-white dark:bg-black"
-            style={{ 
-              zIndex: 1000,
-              right: isMobile ? '25%' : '25%',
-              transform: 'translateX(50%)',
-              fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif',
-              fontSize: isMobile ? '12px' : '14px',
-              fontWeight: 500,
-            }}
-          >
-            <div>User Volume</div>
-            <div className="flex items-center gap-1 md:gap-2 mt-1">
-              <div className="flex gap-0.5">
-                {[...Array(15)].map((_, i) => {
-                  const volume = micFft ? (micFft.reduce((a, b) => a + b, 0) / micFft.length) : 0;
-                  const normalizedVolume = volume > 0.05 ? volume : 0;
-                  return (
-                    <div
-                      key={i}
-                      className={cn(
-                        "w-0.5 md:w-1",
-                        "h-3 md:h-4"
-                      )}
-                      style={{
-                        backgroundColor: i < Math.min(15, Math.floor(normalizedVolume * 15))
-                          ? `rgb(${59 + (i * 4)}, ${130 - (i * 2)}, ${246 - (i * 4)})`
-                          : '#E5E7EB'
-                      }}
-                    />
-                  );
-                })}
-              </div>
-            </div>
-          </div>
+          {/* 其他需要在通话状态显示的内容可以放在这里 */}
         </>
       )}
 
