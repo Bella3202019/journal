@@ -4,6 +4,15 @@ import { useVoice } from "@humeai/voice-react";
 import Expressions from "./Expressions";
 import { AnimatePresence, motion } from "framer-motion";
 import { ComponentRef, forwardRef, useEffect, useState, useRef, useCallback } from "react";
+import StartCall from "./StartCall";
+import { Lora } from 'next/font/google';
+
+// 确保正确初始化 Lora
+const lora = Lora({ 
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'], // 添加需要的字重
+  display: 'swap',
+});
 
 // 定义情绪颜色映射的类型
 type EmotionColorMap = {
@@ -88,7 +97,7 @@ const Messages = forwardRef<
   const [userBackgroundSize, setUserBackgroundSize] = useState(800);
   const [agentBackgroundSize, setAgentBackgroundSize] = useState(800);
   const [userEmotionColors, setUserEmotionColors] = useState<string[]>(["#4169E1", "#87CEEB", "#B0C4DE"]);
-  const [agentEmotionColors, setAgentEmotionColors] = useState<string[]>(["#4169E1", "#87CEEB", "#B0C4DE"]);
+  const [agentEmotionColors, setAgentEmotionColors] = useState<string[]>(["#43aa8b", "#0077b6", "#90be6d"]);
   const [isAgentSpeaking, setIsAgentSpeaking] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -243,22 +252,38 @@ const Messages = forwardRef<
   // 更新情绪颜色
   useEffect(() => {
     const latestMessage = messages[messages.length - 1];
+    
     if (latestMessage?.type === "user_message") {
       const scores = latestMessage.models?.prosody?.scores;
       if (scores) {
+        // 获取前三个最强的情绪及其对应的颜色
         const sortedEmotions = Object.entries(scores)
-          .sort(([, a], [, b]) => b - a)
-          .slice(0, 3)
-          .map(([emotion]) => emotionColorMap[emotion as keyof typeof emotionColorMap] || "#4169E1");
+          .sort(([, a], [, b]) => b - a)  // 按分数降序排序
+          .slice(0, 3)  // 只取前三个
+          .map(([emotion]) => {
+            // 确保从 emotionColorMap 中获取到颜色
+            const color = emotionColorMap[emotion];
+            console.log('User emotion:', emotion, 'color:', color); // 调试日志
+            return color || "#4169E1"; // 如果没找到颜色则使用默认蓝色
+          });
+        
+        console.log('Updated user emotion colors:', sortedEmotions); // 调试日志
         setUserEmotionColors(sortedEmotions);
       }
     } else if (latestMessage?.type === "assistant_message") {
       const scores = latestMessage.models?.prosody?.scores;
       if (scores) {
         const sortedEmotions = Object.entries(scores)
-          .sort(([, a], [, b]) => b - a)
-          .slice(0, 3)
-          .map(([emotion]) => emotionColorMap[emotion as keyof typeof emotionColorMap] || "#4169E1");
+          .sort(([, a], [, b]) => b - a)  // 按分数降序排序
+          .slice(0, 3)  // 只取前三个
+          .map(([emotion]) => {
+            // 确保从 emotionColorMap 中获取到颜色
+            const color = emotionColorMap[emotion];
+            console.log('Agent emotion:', emotion, 'color:', color); // 调试日志
+            return color || "#43aa8b"; // 如果没找到颜色则使用默认青绿色
+          });
+        
+        console.log('Updated agent emotion colors:', sortedEmotions); // 调试日志
         setAgentEmotionColors(sortedEmotions);
         
         // 当 agent 开始说话时
@@ -325,35 +350,32 @@ const Messages = forwardRef<
         "relative",
         "bg-white dark:bg-black",
         "w-full",
-        "overflow-x-hidden"
+        "overflow-x-hidden",
+        lora.className  // 确保在根元素应用字体
       )}
       ref={ref}
     >
-      {/* 水波纹和圆形保持固定位置 */}
-      {/* Agent的水波纹扇形 */}
+      {/* Agent的圆 - 放在最上层 */}
       <motion.div
         className="fixed pointer-events-none"
         style={{
-          left: isMobile ? '50%' : '25%',
-          transform: `${isMobile ? 'translateX(-100%)' : 'translateX(-50%)'} translateY(-50%)`,
-          top: '50%',
-          marginTop: '0',
-          width: isMobile ? '100%' : '50%',
-          height: '100vh',
+          left: '50%',
+          top: '30%',  // Agent 圆形位置
+          transform: 'translateX(-50%) translateY(-50%) rotate(90deg)',
+          width: '15vw',
+          height: '15vw',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           zIndex: 1000,
-          background: 'var(--background)',
         }}
       >
         {/* 内部实心渐变圆 - 使用 SVG */}
         <motion.div
           style={{
             position: 'absolute',
-            width: `${standardHeight}px`,
-            height: `${standardHeight}px`,
-            clipPath: 'inset(0 0 0 50%)',
+            width: '110%',    // 改为100%以填充父容器
+            height: '110%',   // 改为100%以填充父容器
             zIndex: 1000,
           }}
         >
@@ -363,7 +385,7 @@ const Messages = forwardRef<
                 <circle 
                   cx="87" 
                   cy="87" 
-                  r="87" 
+                  r="70" 
                   fill={`url(#agentGradient)`}
                 />
               </g>
@@ -372,11 +394,21 @@ const Messages = forwardRef<
                 <circle 
                   cx="87" 
                   cy="87" 
-                  r="60" 
-                  fill={`url(#agentInnerGradient)`}
+                  r="78" 
                   style={{
+                    fill: `conic-gradient(
+                      from -90deg,      // 从顶部开始
+                      ${agentEmotionColors[0]} 0deg,      // 青绿色 #43aa8b
+                      ${agentEmotionColors[0]} 120deg,    // 第一个颜色结束
+                      ${agentEmotionColors[1]} 120deg,    // 深蓝色 #0077b6 开始
+                      ${agentEmotionColors[1]} 240deg,    // 深蓝色结束
+                      ${agentEmotionColors[2]} 240deg,    // 片绿色 #90be6d 开始
+                      ${agentEmotionColors[2]} 360deg     // 片绿色结束，回到起点
+                    )`,
+                    filter: 'blur(0px)',
                     opacity: isPlaying ? 0.8 : 0.4,
-                    transition: 'opacity 0.3s ease'
+                    transition: 'opacity 0.3s ease',
+                    mixBlendMode: 'soft-light'
                   }}
                 />
               </g>
@@ -420,18 +452,6 @@ const Messages = forwardRef<
                 <stop offset="50%" stopColor={agentEmotionColors[1] || agentEmotionColors[0]} stopOpacity="0.6" />
                 <stop offset="100%" stopColor={agentEmotionColors[2] || agentEmotionColors[0]} stopOpacity="0" />
               </radialGradient>
-              <radialGradient
-                id="agentInnerGradient"
-                cx="0"
-                cy="0"
-                r="1"
-                gradientUnits="userSpaceOnUse"
-                gradientTransform="translate(87 87) rotate(-45) scale(60)"
-              >
-                <stop offset="0%" stopColor={agentEmotionColors[0]} stopOpacity="0.95" />
-                <stop offset="40%" stopColor={agentEmotionColors[1] || agentEmotionColors[0]} stopOpacity="0.8" />
-                <stop offset="100%" stopColor={agentEmotionColors[2] || agentEmotionColors[0]} stopOpacity="0" />
-              </radialGradient>
               <clipPath id="agentClip">
                 <circle cx="87" cy="87" r="87" />
               </clipPath>
@@ -444,22 +464,21 @@ const Messages = forwardRef<
           {[1, 2, 3].map((index) => (
             <motion.div
               key={index}
-              initial={{ scale: 0.4, opacity: 0.8 }}
+              initial={{ scale: 0.4, opacity: 0.8 }}  // 起始比例设为 0.4
               animate={{ 
-                scale: [0.4, 1],
+                scale: [0.75, 1],    // 从 40% 开始扩散到 100%
                 opacity: [0.8, 0],
               }}
               transition={{
-                duration: isMobile ? 10 : 15,
+                duration: isMobile ? 8 : 12,
                 repeat: Infinity,
                 delay: index * (isMobile ? 3 : 4),
                 ease: "easeOut"
               }}
               style={{
                 position: 'absolute',
-                width: `${getSize(agentBackgroundSize)}px`,
-                height: `${getSize(agentBackgroundSize)}px`,
-                clipPath: 'inset(0 0 0 50%)',
+                width: '100%',    // 改为100%以填充父容器
+                height: '100%',   // 改为100%以填充父容器
                 background: `conic-gradient(
                   from 0deg at 50% 50%, 
                   transparent 0deg,
@@ -479,114 +498,137 @@ const Messages = forwardRef<
                   0 0 ${isMobile ? '50px 25px' : '70px 35px'} rgba(255, 255, 255, 0.15)
                 `,
               }}
-            />
+            >
+              <path
+                d={`
+                  M 100, 100
+                  m -75, 0
+                  ${Array.from({ length: 40 }, (_, i) => {  // 增加点数以获得更细腻的波浪
+                    const angle = (i * Math.PI * 2) / 40;
+                    // 创建多层次的波浪效果
+                    const baseRadius = 75;
+                    const wave1 = Math.sin(angle * 8 + Date.now() / 1000) * 6;
+                    const wave2 = Math.sin(angle * 12 + Date.now() / 800) * 4;
+                    const wave3 = Math.sin(angle * 6 + Date.now() / 1200) * 3;
+                    const variance = wave1 + wave2 + wave3;
+                    
+                    const x = Math.cos(angle) * (baseRadius + variance);
+                    const y = Math.sin(angle) * (baseRadius + variance);
+                    return `${i === 0 ? 'M' : 'L'} ${100 + x},${100 + y}`;
+                  }).join(' ')}
+                  Z
+                `}
+                fill={`conic-gradient(
+                  from 0deg at 50% 50%, 
+                  transparent 0deg,
+                  ${agentEmotionColors[0]} 90deg,
+                  ${agentEmotionColors[1]} 135deg,
+                  ${agentEmotionColors[2]} 160deg,
+                  transparent 180deg,
+                  transparent 360deg
+                )`}
+                style={{
+                  filter: 'blur(0px)',
+                  opacity: isPlaying ? 0.9 : 0.5,
+                }}
+              >
+                <animate
+                  attributeName="d"
+                  dur="2s"
+                  repeatCount="indefinite"
+                  values={`
+                    M 100, 100
+                    m -75, 0
+                    ${Array.from({ length: 40 }, (_, i) => {
+                      const angle = (i * Math.PI * 2) / 40;
+                      // 创建动画的第二帧波浪效果
+                      const baseRadius = 75;
+                      const wave1 = Math.cos(angle * 8) * 6;
+                      const wave2 = Math.cos(angle * 12) * 4;
+                      const wave3 = Math.cos(angle * 6) * 3;
+                      const variance = wave1 + wave2 + wave3;
+                      
+                      const x = Math.cos(angle) * (baseRadius + variance);
+                      const y = Math.sin(angle) * (baseRadius + variance);
+                      return `${i === 0 ? 'M' : 'L'} ${100 + x},${100 + y}`;
+                    }).join(' ')}
+                    Z
+                  `}
+                />
+              </path>
+            </motion.div>
           ))}
         </>
       </motion.div>
 
-      {/* User的背景圆 */}
-      <motion.div
-        className="fixed pointer-events-none flex items-center justify-center"
+      {/* 问候语 */}
+      <div
+        className={cn(
+          "fixed text-center pointer-events-none",
+          "text-black/70 dark:text-white/70",
+          lora.className
+        )}
         style={{
-          right: isMobile ? '50%' : '25%',
-          transform: `${isMobile ? 'translateX(100%)' : 'translateX(50%)'} translateY(-50%)`,
-          top: '50%',
-          marginTop: '0',
-          zIndex: 100,
-          background: 'var(--background)',
+          left: '50%',
+          top: '53%',  // 在 Agent (30%) 和 StartCall (80%) 之间
+          transform: 'translateX(-50%)',
+          fontSize: '1.5rem',
+          fontWeight: 500,
+          zIndex: 999,
         }}
       >
-        {/* 内部实心渐变圆 */}
+        How's your day been?
+      </div>
+
+      {/* StartCall Button */}
+      <div
+        className={cn(
+          "fixed",
+          lora.className
+        )}
+        style={{
+          left: '50%',
+          top: '60%',  // StartCall 按钮位置
+          transform: 'translateX(-50%)',
+          zIndex: 998,
+        }}
+      >
+        <StartCall />
+      </div>
+
+      {/* User的圆形 - 放在下方且更大 */}
+      <motion.div
+        className="fixed pointer-events-none"
+        style={{
+          left: '50%',
+          bottom: '-140%',
+          transform: 'translateX(-50%)',
+          width: '1600px',
+          height: '1600px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 900,
+        }}
+      >
+        {/* User的圆形渐变和动画效果 */}
         <motion.div
           style={{
             position: 'absolute',
-            width: `${userBackgroundSize}px`,
-            height: `${userBackgroundSize}px`,
-            zIndex: 1000,
-            transition: 'width 0.2s ease-out, height 0.2s ease-out'
+            width: '100%',
+            height: '100%',
+            background: `conic-gradient(
+              ${userEmotionColors[0]} 0deg,
+              ${userEmotionColors[1] || userEmotionColors[0]} 90deg,
+              ${userEmotionColors[2] || userEmotionColors[0]} 240deg,
+              ${userEmotionColors[0]} 360deg
+            )`,
+            filter: 'blur(0px)',
+            opacity: 0.7,
+            mixBlendMode: 'soft-light',
+            borderRadius: '50%',
           }}
-        >
-          <svg width="100%" height="100%" viewBox="0 0 174 174" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <g clipPath="url(#userClip)">
-              <g filter="url(#userBlur)">
-                <circle 
-                  cx="87" 
-                  cy="87" 
-                  r="87" 
-                  fill={`url(#userGradient)`}
-                />
-              </g>
-              {/* 添加内部发光效果 */}
-              <g filter="url(#userGlow)">
-                <circle 
-                  cx="87" 
-                  cy="87" 
-                  r="60" 
-                  fill={`url(#userInnerGradient)`}
-                  style={{
-                    opacity: micFft && micFft.reduce((a, b) => a + b, 0) > 0.05 ? 0.9 : 0.4, // 增加说话时的不透明度
-                    transition: 'opacity 0.15s ease' // 加快透明度变化
-                  }}
-                />
-              </g>
-            </g>
-            <defs>
-              <filter
-                id="userBlur"
-                x="-36"
-                y="-36"
-                width="246"
-                height="246"
-                filterUnits="userSpaceOnUse"
-                colorInterpolationFilters="sRGB"
-              >
-                <feFlood floodOpacity="0" result="BackgroundImageFix" />
-                <feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape" />
-                <feGaussianBlur stdDeviation="18" result="effect1_foregroundBlur" />
-              </filter>
-              <filter
-                id="userGlow"
-                x="-10"
-                y="-10"
-                width="194"
-                height="194"
-                filterUnits="userSpaceOnUse"
-                colorInterpolationFilters="sRGB"
-              >
-                <feFlood floodOpacity="0" result="BackgroundImageFix" />
-                <feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape" />
-                <feGaussianBlur stdDeviation="8" result="effect1_foregroundBlur" />
-              </filter>
-              <radialGradient
-                id="userGradient"
-                cx="0"
-                cy="0"
-                r="1"
-                gradientUnits="userSpaceOnUse"
-                gradientTransform="translate(87 87) rotate(90) scale(87)"
-              >
-                <stop offset="0%" stopColor={userEmotionColors[0]} stopOpacity="0.9" />
-                <stop offset="50%" stopColor={userEmotionColors[1] || userEmotionColors[0]} stopOpacity="0.6" />
-                <stop offset="100%" stopColor={userEmotionColors[2] || userEmotionColors[0]} stopOpacity="0" />
-              </radialGradient>
-              <radialGradient
-                id="userInnerGradient"
-                cx="0"
-                cy="0"
-                r="1"
-                gradientUnits="userSpaceOnUse"
-                gradientTransform="translate(87 87) rotate(-45) scale(60)"
-              >
-                <stop offset="0%" stopColor={userEmotionColors[0]} stopOpacity="0.95" />
-                <stop offset="40%" stopColor={userEmotionColors[1] || userEmotionColors[0]} stopOpacity="0.8" />
-                <stop offset="100%" stopColor={userEmotionColors[2] || userEmotionColors[0]} stopOpacity="0" />
-              </radialGradient>
-              <clipPath id="userClip">
-                <circle cx="87" cy="87" r="87" />
-              </clipPath>
-            </defs>
-          </svg>
-        </motion.div>
+        />
       </motion.div>
 
       {/* 可滚动的消息列表容器 */}
@@ -596,25 +638,30 @@ const Messages = forwardRef<
           "w-full",
           "relative z-10",
           "overflow-y-auto",
-          "overflow-x-visible",
-          "h-[calc(100vh-4rem)]",
+          "overflow-x-hidden",  // 防止水平滚动
+          "h-screen",  // 改为 h-screen，确保高度正好是视窗高度
           "scrollbar-thin",
           "scrollbar-thumb-gray-200 dark:scrollbar-thumb-gray-700",
-          "scrollbar-track-transparent hover:scrollbar-thumb-gray-300 dark:hover:scrollbar-thumb-gray-600",
+          "scrollbar-track-transparent",
           "pb-24",
           "px-[300px] md:px-[400px]",
-          "bg-white dark:bg-black"
+          "bg-white dark:bg-black",
+          lora.className
         )}
         style={{
-          scrollBehavior: 'smooth'
+          scrollBehavior: 'smooth',
+          height: '100vh',  // 确保高度是视窗高度
+          maxHeight: '100vh',  // 限制最大高度
+          overflowY: 'hidden',  // 默认隐藏滚动条
         }}
       >
         <div 
           className="relative w-full" 
           style={{
-            minHeight: `${messages.length * standardHeight * 1.1 + window.innerHeight}px`,
-            paddingTop: `${window.innerHeight / 2}px`, // 顶部填充
-            paddingBottom: `${window.innerHeight / 2}px` // 底部填充
+            minHeight: '100vh',  // 改为视窗高度
+            height: '100vh',     // 固定高度
+            paddingTop: '20vh',  // 使用视窗高度的百分比
+            paddingBottom: '20vh'
           }}
         >
           <AnimatePresence mode="popLayout">
@@ -758,6 +805,7 @@ const Messages = forwardRef<
           </div>
         </>
       )}
+
     </motion.div>
   );
 });

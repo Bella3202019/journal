@@ -1,7 +1,6 @@
 import { useVoice } from "@humeai/voice-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Button } from "./ui/button";
-import { Phone } from "lucide-react";
 import { getAuth } from 'firebase/auth';
 import { storeChatMapping } from '@/lib/db';
 import { useEffect } from "react";
@@ -38,31 +37,30 @@ export default function StartCall() {
     <AnimatePresence mode="wait">
       {status.value !== "connected" ? (
         <motion.div
-          className="fixed inset-0 flex items-center justify-center bg-white dark:bg-black z-[200]"
+          className="flex items-center justify-center bg-white dark:bg-black"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.3 }}
         >
-          <motion.div
-            initial={{ scale: 0.95, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.95, opacity: 0 }}
-            transition={{ duration: 0.2 }}
+          <Button
+            onClick={handleStartCall}
+            disabled={status.value === "connecting"}
+            className="w-24 h-24 rounded-full flex items-center justify-center bg-white dark:bg-black hover:bg-gray-50 dark:hover:bg-gray-900 transition-all duration-200 hover:scale-105 hover:shadow-sm"
           >
-            <Button
-              className="flex items-center gap-3 text-xl px-8 py-6 hover:bg-primary/90"
-              onClick={handleStartCall}
-              disabled={status.value === "connecting"}
-            >
-              <Phone className="size-6 opacity-50" strokeWidth={2} />
-              <span>
-                {status.value === "connecting" 
-                  ? "Connecting..." 
-                  : "How's your day been?"}
-              </span>
-            </Button>
-          </motion.div>
+            <div className="flex items-center gap-[6px] scale-150">
+              {/* Left dot */}
+              <div className="w-[4px] h-[4px] bg-gray-400 dark:bg-gray-600 rounded-full" />
+              
+              {/* Center bars */}
+              <div className="w-[3px] h-4 bg-gray-400 dark:bg-gray-600 rounded-full" />
+              <div className="w-[3px] h-6 bg-gray-400 dark:bg-gray-600 rounded-full" />
+              <div className="w-[3px] h-4 bg-gray-400 dark:bg-gray-600 rounded-full" />
+              
+              {/* Right dot */}
+              <div className="w-[4px] h-[4px] bg-gray-400 dark:bg-gray-600 rounded-full" />
+            </div>
+          </Button>
         </motion.div>
       ) : null}
     </AnimatePresence>

@@ -20,25 +20,21 @@ export default async function Page() {
   return (
     <main className={cn(
       // Layout
-      "flex flex-col grow",
-      "w-full min-h-screen",
-      "relative",
-      
-      // Spacing
-      "md:px-4",
+      "w-screen h-screen",
+      "fixed inset-0",
       "overflow-hidden",
       
       // Colors
       "bg-white dark:bg-zinc-900",
       "text-zinc-900 dark:text-zinc-100",
     )}>
-      {/* 修改 AuthButton 的位置 */}
+      {/* AuthButton */}
       <div className="fixed top-4 right-4 z-50">
         <AuthButton />
       </div>
 
       {/* 内容层 */}
-      <div className="relative z-10">
+      <div className="relative w-full h-full">
         <Chat accessToken={accessToken} />
       </div>
 
