@@ -37,7 +37,7 @@ export default function StartCall() {
     <AnimatePresence mode="wait">
       {status.value !== "connected" ? (
         <motion.div
-          className="flex items-center justify-center bg-white dark:bg-black"
+          className="flex items-center justify-center bg-transparent hover:scale-110 transition-all duration-300"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -46,19 +46,19 @@ export default function StartCall() {
           <Button
             onClick={handleStartCall}
             disabled={status.value === "connecting"}
-            className="w-24 h-24 rounded-full flex items-center justify-center bg-white dark:bg-black hover:bg-gray-50 dark:hover:bg-gray-900 transition-all duration-200 hover:scale-105 hover:shadow-sm"
+            className="w-24 h-24 rounded-full flex items-center justify-center bg-transparent hover:bg-transparent dark:hover:bg-transparent"
           >
             <div className="flex items-center gap-[6px] scale-150">
               {/* Left dot */}
-              <div className="w-[4px] h-[4px] bg-gray-400 dark:bg-gray-600 rounded-full" />
+              <div className="w-[4px] h-[4px] bg-black dark:bg-white rounded-full" />
               
               {/* Center bars */}
-              <div className="w-[3px] h-4 bg-gray-400 dark:bg-gray-600 rounded-full" />
-              <div className="w-[3px] h-6 bg-gray-400 dark:bg-gray-600 rounded-full" />
-              <div className="w-[3px] h-4 bg-gray-400 dark:bg-gray-600 rounded-full" />
+              <div className="w-[3px] h-4 bg-black dark:bg-white rounded-full" />
+              <div className="w-[3px] h-6 bg-black dark:bg-white rounded-full" />
+              <div className="w-[3px] h-4 bg-black dark:bg-white rounded-full" />
               
               {/* Right dot */}
-              <div className="w-[4px] h-[4px] bg-gray-400 dark:bg-gray-600 rounded-full" />
+              <div className="w-[4px] h-[4px] bg-black dark:bg-white rounded-full" />
             </div>
           </Button>
         </motion.div>

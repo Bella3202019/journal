@@ -122,6 +122,7 @@ const Messages = forwardRef<
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   
+  
   useEffect(() => {
     const handleScroll = () => {
       setScrollY(window.scrollY);
@@ -344,19 +345,22 @@ const Messages = forwardRef<
         "bg-white dark:bg-black",
         "w-full",
         "overflow-x-hidden",
-        lora.className  // 确保在根元素应用字体
+        lora.className
       )}
       ref={ref}
+      style={{
+        zIndex: 1  // 确保背景在最底层
+      }}
     >
-      {/* Agent的圆 - 放在最上层 */}
+      {/* Agent的圆 - 一直显示 */}
       <motion.div
         className="fixed pointer-events-none"
         style={{
           left: '50%',
-          top: '30%',  // Agent 圆形位置
+          top: isMobile ? '20%' : '30%',  // 只调整移动端位置
           transform: 'translateX(-50%) translateY(-50%) rotate(90deg)',
-          width: '15vw',
-          height: '15vw',
+          width: isMobile ? '280px' : '15vw',  // 移动端使用固定大小
+          height: isMobile ? '280px' : '15vw',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -367,8 +371,8 @@ const Messages = forwardRef<
         <motion.div
           style={{
             position: 'absolute',
-            width: '110%',    // 改为100%以填充父容器
-            height: '110%',   // 改为100%以填充父容器
+            width: '110%',
+            height: '110%',
             zIndex: 1000,
           }}
         >
@@ -554,29 +558,8 @@ const Messages = forwardRef<
         </>
       </motion.div>
 
-      {/* Agent状态显示 */}
-      <div
-        className={cn(
-          "fixed text-center pointer-events-none",
-          "text-black/70 dark:text-white/70",
-          lora.className
-        )}
-        style={{
-          left: '50%',
-          top: '29%',  // 与 Agent 圆形位置对应
-          transform: 'translateX(-50%)',
-          fontSize: '1rem',
-          fontWeight: 500,
-          zIndex: 1100,
-          color: 'rgba(255, 255, 255, 0.8)',  // 增加不透明度
-          textShadow: '0 0 10px rgba(255, 255, 255, 0.3)',  // 添加轻微发光效果
-        }}
-      >
-        {getAgentStatus()}
-      </div>
-
-      {/* 问候语 */}
-      {!status.value.includes("connected") && (  // 当不是通话状态时才显示
+      {/* Agent状态显示 - 只在通话连接后显示 */}
+      {status.value === "connected" && (
         <div
           className={cn(
             "fixed text-center pointer-events-none",
@@ -585,14 +568,37 @@ const Messages = forwardRef<
           )}
           style={{
             left: '50%',
-            top: '53%',  // 在 Agent (30%) 和 StartCall (80%) 之间
+            top: '29%',
             transform: 'translateX(-50%)',
-            fontSize: '1.5rem',
+            fontSize: '1rem',
+            fontWeight: 500,
+            zIndex: 1100,
+            color: 'rgba(255, 255, 255, 0.8)',
+            textShadow: '0 0 10px rgba(255, 255, 255, 0.3)',
+          }}
+        >
+          {getAgentStatus()}
+        </div>
+      )}
+
+      {/* 问候语 - 只在页面初始加载时显示 */}
+      {status.value === "disconnected" && (
+        <div
+          className={cn(
+            "fixed text-center pointer-events-none",
+            "text-black/70 dark:text-white/70",
+            lora.className
+          )}
+          style={{
+            left: '50%',
+            top: isMobile ? '44%' : '48%',  // 只调整移动端位置
+            transform: 'translateX(-50%)',
+            fontSize: isMobile ? '1.1rem' : '1.7rem',  // 移动端字体稍小
             fontWeight: 500,
             zIndex: 999,
           }}
         >
-          Hey, how's your day been?
+          Hey,<br />how's your day been?
         </div>
       )}
 
@@ -604,8 +610,8 @@ const Messages = forwardRef<
         )}
         style={{
           left: '50%',
-          top: '60%',  // StartCall 按钮位置
-          transform: 'translateX(-50%)',
+          top: isMobile ? '55%' : '60%',  // 只调整移动端位置
+          transform: isMobile ? 'translate(-50%, 0) scale(0.6)' : 'translate(-50%, 0)',
           zIndex: 998,
         }}
       >
@@ -617,7 +623,7 @@ const Messages = forwardRef<
         className="fixed pointer-events-none"
         style={{
           left: '50%',
-          bottom: '-160%',
+          bottom: '-160%',  // 改为 -120%，让更多部分显示在视窗中
           transform: 'translateX(-50%)',
           width: '2000px',
           height: '2000px',
@@ -630,11 +636,11 @@ const Messages = forwardRef<
         {/* 波浪圆形 */}
         <svg width="100%" height="100%" viewBox="0 0 2000 2000">
           <defs>
-            <radialGradient id="userGradient">
-              <stop offset="0%" stopColor={userEmotionColors[0]} stopOpacity="0.7" />
-              <stop offset="70%" stopColor={userEmotionColors[1] || userEmotionColors[0]} stopOpacity="0.5" />
-              <stop offset="100%" stopColor={userEmotionColors[2] || userEmotionColors[0]} stopOpacity="0.3" />
-            </radialGradient>
+            <linearGradient id="userGradient" gradientTransform="rotate(45, 0.5, 0.5)">
+              <stop offset="0%" stopColor={userEmotionColors[0] || "#ff8b8b"} stopOpacity="0.7" />
+              <stop offset="50%" stopColor={userEmotionColors[1] || "#ffb4b4"} stopOpacity="0.7" />
+              <stop offset="100%" stopColor={userEmotionColors[2] || "#ffd6e0"} stopOpacity="0.7" />
+            </linearGradient>
           </defs>
           
           <path
@@ -700,6 +706,12 @@ const Messages = forwardRef<
             style={{
               filter: 'blur(2px)',
               mixBlendMode: 'soft-light',
+              background: `conic-gradient(
+                from 275deg,
+                ${userEmotionColors[0] || "#ff8b8b"} 0deg,
+                ${userEmotionColors[1] || "#ffb4b4"} 85deg,
+                ${userEmotionColors[2] || "#ffd6e0"} 130deg
+              )`,
             }}
           >
             <animate
@@ -769,22 +781,17 @@ const Messages = forwardRef<
         className={cn(
           "w-full",
           "relative z-10",
-          "overflow-y-auto",  // 改为 auto 以显示滚动条
           "overflow-x-hidden",
           "h-screen",
-          "scrollbar-thin",
-          "scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600", // 调整滚动条颜色
-          "scrollbar-track-gray-100 dark:scrollbar-track-gray-800", // 添加滚动条轨道颜色
           "pb-24",
           "px-[300px] md:px-[400px]",
           "bg-white dark:bg-black",
           lora.className
         )}
         style={{
-          scrollBehavior: 'smooth',
           height: '100vh',
           maxHeight: '100vh',
-          overflowY: 'auto',  // 改为 auto
+          overflowY: 'hidden',  // 改为 hidden
         }}
       >
         <div 

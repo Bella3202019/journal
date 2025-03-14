@@ -12,6 +12,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
     "@humeai/voice-react": "^0.1.15",
+    "@next/font": "^14.2.15",
     "@radix-ui/react-dialog": "^1.1.6",
     "@radix-ui/react-dropdown-menu": "^2.1.6",
     "@radix-ui/react-slot": "^1.1.2",

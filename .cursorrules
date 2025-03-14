@@ -1,0 +1,4 @@
+use npm to install the dependencies, not pnpm
+
+alway focus on the changes, not the whole file. don't change other necessary code. don't mess up the code.
+
