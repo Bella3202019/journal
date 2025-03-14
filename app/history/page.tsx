@@ -94,13 +94,18 @@ export default function HistoryPage() {
     const lastEvent = chat.events[chat.events.length - 1];
     const durationMs = lastEvent.timestamp - firstEvent.timestamp;
     const durationSeconds = Math.floor(durationMs / 1000);
-    const duration = `${Math.floor(durationSeconds / 60)}m ${durationSeconds % 60}s`;
+    
+    // 修改时长显示逻辑
+    const minutes = Math.floor(durationSeconds / 60);
+    const seconds = durationSeconds % 60;
+    const duration = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
 
     // 如果对话时长不超过15秒，使用固定文字
     const summary = durationSeconds <= 15 
       ? "Test is for a better future"
       : await generateSummary(messages);
 
+    // 修改日期显示格式
     const startDate = new Date(firstEvent.timestamp);
     const today = new Date();
     const yesterday = new Date(today);
@@ -112,11 +117,11 @@ export default function HistoryPage() {
     } else if (startDate.toDateString() === yesterday.toDateString()) {
       startTimeStr = `Yesterday, ${startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
     } else {
-      startTimeStr = startDate.toLocaleDateString([], {
-        month: 'short',
+      // 使用 "Sun, 26 Feb" 格式
+      startTimeStr = startDate.toLocaleDateString('en-US', {
+        weekday: 'short',
         day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
+        month: 'short'
       });
     }
 
@@ -239,7 +244,7 @@ export default function HistoryPage() {
             "text-lg font-medium",
             "text-gray-900 dark:text-gray-100",
           )}>
-            Moments Shared with Dela
+            Echo moments
           </h1>
         </div>
         <AuthButton />
