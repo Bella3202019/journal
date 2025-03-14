@@ -220,7 +220,7 @@ export default function HistoryPage() {
       "w-full min-h-screen",
       "bg-gray-50 dark:bg-zinc-900",
       "text-zinc-900 dark:text-zinc-100",
-      lora.className  // 添加 Lora 字体到整个页面
+      lora.className
     )}>
       <div className={cn(
         "sticky top-0",
@@ -264,31 +264,16 @@ export default function HistoryPage() {
         ) : (
           <>
             <div className={cn(
-              "grid gap-6",
+              "grid gap-8",  // 增加间距
               "grid-cols-1 md:grid-cols-3",
-              "auto-rows-max",
-              "mb-6"
+              "auto-rows-max"
             )}>
               {formattedChats.map((chat, index) => (
                 <div 
                   key={`chat-${chat.chatId}-${index}`}
-                  className={cn(
-                    "group",
-                    "bg-white dark:bg-zinc-800",
-                    "rounded-xl",
-                    "border dark:border-zinc-700",
-                    "shadow-sm",
-                    "transition-all duration-200",
-                    "hover:shadow-md hover:border-gray-300 dark:hover:border-zinc-600",
-                    "cursor-pointer",
-                    "overflow-hidden",
-                    "w-full",
-                    "flex flex-col",
-                    "min-h-[280px]"  // 减小最小高度
-                  )}
+                  className="w-full px-1"  // 简化容器样式
                   onClick={() => toggleChat(chat.chatId)}
                 >
-                  {/* 艺术化的渐变背景 */}
                   <motion.div 
                     className={cn(
                       "w-full h-48",
@@ -297,9 +282,8 @@ export default function HistoryPage() {
                       lightGradients[index % lightGradients.length],
                       darkGradients[index % darkGradients.length],
                       gradientPositions[index % gradientPositions.length],
-                      "bg-white dark:bg-zinc-900",
                       "relative overflow-hidden",
-                      "backdrop-filter backdrop-blur-[1px]"  // 添加轻微模糊
+                      "mb-3"  // 添加底部间距
                     )}
                     whileHover={{ 
                       scale: 1.02,
@@ -307,7 +291,7 @@ export default function HistoryPage() {
                     }}
                     transition={{ duration: 0.2 }}
                   >
-                    {/* 磨砂玻璃效果层 */}
+                    {/* 磨砂效果层保持不变 */}
                     <div className={cn(
                       "absolute inset-0",
                       "bg-gradient-to-br from-white/10 via-transparent to-black/5",
@@ -316,39 +300,31 @@ export default function HistoryPage() {
                       "backdrop-filter backdrop-blur-[0.5px]"
                     )} />
                     
-                    {/* 纹理效果层 */}
                     <div className={cn(
                       "absolute inset-0",
-                      "bg-noise",  // 需要在 globals.css 中定义
+                      "bg-noise",
                       "opacity-[0.15]",
                       "mix-blend-overlay"
                     )} />
                   </motion.div>
 
                   <div className={cn(
-                    "p-4",
-                    lora.className  // 确保卡片内容也使用 Lora 字体
+                    "flex justify-between items-center",
+                    "px-1",
+                    "text-black-700 dark:text-white-500"
                   )}>
-                    <div className={cn(
-                      "flex justify-between items-center",
-                      "text-sm",
-                      "text-gray-500 dark:text-gray-400"
-                    )}>
-                      <time>{chat.startTime}</time>
-                      <div>{chat.duration}</div>
-                    </div>
-                    
-                    <div className={cn(
-                      "mt-2",
-                      "text-base",
-                      "text-gray-600 dark:text-gray-400",
-                      "leading-relaxed",
-                      "font-normal",
-                      "line-clamp-2"
-                    )}>
-                      {chat.summary}
-                    </div>
+                    <time className="text-lg font-medium">{chat.startTime}</time>
+                    <span className="text-gray-500 dark:text-gray-400">{chat.duration}</span>
                   </div>
+                  
+                  <p className={cn(
+                    "mt-1 px-1",
+                    "text-black-700 dark:text-white-500",
+                    "line-clamp-2",
+                    "text-left"
+                  )}>
+                    {chat.summary}
+                  </p>
                 </div>
               ))}
             </div>
