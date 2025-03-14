@@ -6,6 +6,8 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ComponentRef, forwardRef, useEffect, useState, useRef, useCallback } from "react";
 import StartCall from "./StartCall";
 import { Lora } from 'next/font/google';
+import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 
 // 确保正确初始化 Lora
 const lora = Lora({ 
@@ -121,6 +123,7 @@ const Messages = forwardRef<
   const [isAgentSpeaking, setIsAgentSpeaking] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
   
   
   useEffect(() => {
@@ -352,6 +355,20 @@ const Messages = forwardRef<
         zIndex: 1  // 确保背景在最底层
       }}
     >
+      {/* History Button */}
+      <div 
+        className="absolute left-4 top-4 w-10 h-10 cursor-pointer z-50"
+        onClick={() => router.push('/history')}
+      >
+        <Image
+          src="/history.png"
+          alt="History"
+          width={40}
+          height={40}
+          className="rounded-full hover:opacity-80 transition-opacity"
+        />
+      </div>
+
       {/* Agent的圆 - 一直显示 */}
       <motion.div
         className="fixed pointer-events-none"
