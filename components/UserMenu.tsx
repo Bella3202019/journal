@@ -112,7 +112,7 @@ export default function UserMenu() {
             className="cursor-pointer"
           >
             <History className="mr-2 h-4 w-4" />
-            View History
+           History
           </DropdownMenuItem>
           <DropdownMenuItem onClick={handleSignOut} className="cursor-pointer">
             <LogOut className="mr-2 h-4 w-4" />
