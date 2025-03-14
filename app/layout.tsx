@@ -7,7 +7,7 @@ import { cn } from "@/utils";
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'),
-  title: "Dela: How's your day been?",
+  title: "Echome",
   description: "Your emotional support partner",
   openGraph: {
     images: ['/title.png'],
