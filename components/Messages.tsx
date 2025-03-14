@@ -638,21 +638,25 @@ const Messages = forwardRef<
 
       {/* User的圆形 */}
       <motion.div
-        className="fixed pointer-events-none"
+        className="absolute pointer-events-none overflow-hidden"
         style={{
           left: '50%',
-          bottom: isMobile ? '-110%' : '-160%',  // 调整移动端位置
           transform: 'translateX(-50%)',
-          width: isMobile ? '1000px' : '2000px', // 调整移动端大小
-          height: isMobile ? '1000px' : '2000px', // 调整移动端大小
+          width: isMobile ? '1200px' : '2000px',
+          height: '100vh',  // 限制为视口高度
+          top: isMobile ? '60vh' : '60vh',
           display: 'flex',
-          alignItems: 'center',
+          alignItems: 'flex-start',
           justifyContent: 'center',
           zIndex: 900,
         }}
       >
-        {/* 波浪圆形 */}
-        <svg width="100%" height="100%" viewBox="0 0 2000 2000">
+        <svg 
+          width="100%" 
+          height="100vh"  // 限制 SVG 高度为视口高度
+          viewBox={`0 0 2000 1000`}  // 调整 viewBox 高度
+          preserveAspectRatio="xMidYMin slice"
+        >
           <defs>
             <linearGradient id="userGradient" gradientTransform="rotate(45, 0.5, 0.5)">
               <stop offset="0%" stopColor={userEmotionColors[0] || "#ff8b8b"} stopOpacity="0.7" className="dark:opacity-70 opacity-40" />
@@ -789,13 +793,13 @@ const Messages = forwardRef<
         </svg>
       </motion.div>
 
-      {/* 可滚动的消息列表容器 */}
+      {/* 消息容器 */}
       <motion.div
         ref={scrollContainerRef}
         className={cn(
           "w-full",
           "relative z-10",
-          "overflow-x-hidden",
+          "overflow-hidden",  // 改为 hidden 禁用所有滚动
           "h-screen",
           "pb-24",
           "px-[300px] md:px-[400px]",
@@ -805,16 +809,17 @@ const Messages = forwardRef<
         style={{
           height: '100vh',
           maxHeight: '100vh',
-          overflowY: 'hidden',  // 改为 hidden
+          position: 'fixed',  // 固定定位防止滚动
+          top: 0,
+          left: 0,
+          right: 0,
         }}
       >
         <div 
           className="relative w-full" 
           style={{
-            minHeight: '100vh',  // 改为视窗高度
-            height: '100vh',     // 固定高度
-            paddingTop: '20vh',  // 使用视窗高度的百分比
-            paddingBottom: '20vh'
+            height: '100vh',
+            overflow: 'hidden',  // 确保内部也不会滚动
           }}
         >
           <AnimatePresence mode="popLayout">

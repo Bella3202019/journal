@@ -35,13 +35,20 @@ export default function StartCall() {
 
   return (
     <AnimatePresence mode="wait">
-      {status.value !== "connected" ? (
+      {status.value !== "connected" && (
         <motion.div
-          className="flex items-center justify-center bg-transparent"
+          className="flex items-center justify-center bg-transparent fixed"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.3 }}
+          style={{
+            left: '50%',
+            top: '60%',
+            transform: 'translateX(-50%)',
+            zIndex: 1000,
+            overflow: 'hidden'
+          }}
         >
           <div
             onClick={handleStartCall}
@@ -60,7 +67,7 @@ export default function StartCall() {
             />
           </div>
         </motion.div>
-      ) : null}
+      )}
     </AnimatePresence>
   );
 }
