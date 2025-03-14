@@ -11,11 +11,11 @@ if (!getApps().length) {
   const serviceAccount: ServiceAccount = {
     projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID!,
     clientEmail: process.env.FIREBASE_CLIENT_EMAIL!,
-    privateKey: process.env.FIREBASE_PRIVATE_KEY!
+    privateKey: privateKey
   };
 
   // 验证必要的凭证是否存在
-  if (!serviceAccount.projectId || !serviceAccount.clientEmail || !serviceAccount.privateKey) {
+  if (!serviceAccount.projectId || !serviceAccount.clientEmail || !privateKey) {
     throw new Error('Missing Firebase Admin credentials');
   }
 
