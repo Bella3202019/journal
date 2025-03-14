@@ -374,10 +374,10 @@ const Messages = forwardRef<
         className="fixed pointer-events-none"
         style={{
           left: '50%',
-          top: isMobile ? '20%' : '30%',  // 只调整移动端位置
+          top: isMobile ? '20%' : '30%',  // 调整移动端位置
           transform: 'translateX(-50%) translateY(-50%) rotate(90deg)',
-          width: isMobile ? '280px' : '15vw',  // 移动端使用固定大小
-          height: isMobile ? '280px' : '15vw',
+          width: isMobile ? '200px' : '15vw',  // 减小移动端尺寸
+          height: isMobile ? '200px' : '15vw',  // 减小移动端尺寸
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -400,6 +400,7 @@ const Messages = forwardRef<
                   cx="87" 
                   cy="87" 
                   r="70" 
+                  className="dark:opacity-100 opacity-60"  // 添加明暗模式透明度调整
                   fill={`url(#agentGradient)`}
                 />
               </g>
@@ -411,13 +412,13 @@ const Messages = forwardRef<
                   r="78" 
                   style={{
                     fill: `conic-gradient(
-                      from -90deg,      // 从顶部开始
-                      ${agentEmotionColors[0]} 0deg,      // 青绿色 #43aa8b
-                      ${agentEmotionColors[0]} 120deg,    // 第一个颜色结束
-                      ${agentEmotionColors[1]} 120deg,    // 深蓝色 #0077b6 开始
-                      ${agentEmotionColors[1]} 240deg,    // 深蓝色结束
-                      ${agentEmotionColors[2]} 240deg,    // 片绿色 #90be6d 开始
-                      ${agentEmotionColors[2]} 360deg     // 片绿色结束，回到起点
+                      from -90deg,
+                      ${agentEmotionColors[0]} 0deg,
+                      ${agentEmotionColors[0]} 120deg,
+                      ${agentEmotionColors[1]} 120deg,
+                      ${agentEmotionColors[1]} 240deg,
+                      ${agentEmotionColors[2]} 240deg,
+                      ${agentEmotionColors[2]} 360deg
                     )`,
                     filter: 'blur(0px)',
                     opacity: isPlaying ? 0.8 : 0.4,
@@ -603,12 +604,12 @@ const Messages = forwardRef<
         <div
           className={cn(
             "fixed text-center pointer-events-none",
-            "text-black/70 dark:text-white/70",
+            "text-black/80 dark:text-white/90",
             lora.className
           )}
           style={{
             left: '50%',
-            top: isMobile ? '44%' : '48%',  // 只调整移动端位置
+            top: isMobile ? '42%' : '48%',  // 只调整移动端位置
             transform: 'translateX(-50%)',
             fontSize: isMobile ? '1.1rem' : '1.7rem',  // 移动端字体稍小
             fontWeight: 500,
@@ -640,10 +641,10 @@ const Messages = forwardRef<
         className="fixed pointer-events-none"
         style={{
           left: '50%',
-          bottom: '-160%',  // 改为 -120%，让更多部分显示在视窗中
+          bottom: isMobile ? '-110%' : '-160%',  // 调整移动端位置
           transform: 'translateX(-50%)',
-          width: '2000px',
-          height: '2000px',
+          width: isMobile ? '1000px' : '2000px', // 调整移动端大小
+          height: isMobile ? '1000px' : '2000px', // 调整移动端大小
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -654,9 +655,9 @@ const Messages = forwardRef<
         <svg width="100%" height="100%" viewBox="0 0 2000 2000">
           <defs>
             <linearGradient id="userGradient" gradientTransform="rotate(45, 0.5, 0.5)">
-              <stop offset="0%" stopColor={userEmotionColors[0] || "#ff8b8b"} stopOpacity="0.7" />
-              <stop offset="50%" stopColor={userEmotionColors[1] || "#ffb4b4"} stopOpacity="0.7" />
-              <stop offset="100%" stopColor={userEmotionColors[2] || "#ffd6e0"} stopOpacity="0.7" />
+              <stop offset="0%" stopColor={userEmotionColors[0] || "#ff8b8b"} stopOpacity="0.7" className="dark:opacity-70 opacity-40" />
+              <stop offset="50%" stopColor={userEmotionColors[1] || "#ffb4b4"} stopOpacity="0.7" className="dark:opacity-70 opacity-40" />
+              <stop offset="100%" stopColor={userEmotionColors[2] || "#ffd6e0"} stopOpacity="0.7" className="dark:opacity-70 opacity-40" />
             </linearGradient>
           </defs>
           
@@ -720,15 +721,11 @@ const Messages = forwardRef<
               Z
             `}
             fill="url(#userGradient)"
+            className="dark:opacity-70 opacity-40"
             style={{
               filter: 'blur(2px)',
               mixBlendMode: 'soft-light',
-              background: `conic-gradient(
-                from 275deg,
-                ${userEmotionColors[0] || "#ff8b8b"} 0deg,
-                ${userEmotionColors[1] || "#ffb4b4"} 85deg,
-                ${userEmotionColors[2] || "#ffd6e0"} 130deg
-              )`,
+              opacity: 0.7
             }}
           >
             <animate
