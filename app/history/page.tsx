@@ -13,6 +13,8 @@ import { getAuth } from 'firebase/auth';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { app } from '@/lib/firebase';
 import { getUserChatIds } from '@/lib/db';
+import { motion } from 'framer-motion';
+import { lora } from "@/app/fonts";  // 确保导入 Lora 字体
 
 const AuthButton = dynamic(() => import("@/components/AuthButton"), {
   ssr: false,
@@ -29,6 +31,39 @@ interface FormattedChat {
     messageText: string;
   }[];
 }
+
+// 浅色模式渐变色组合 - 减少白色区域
+const lightGradients = [
+  'from-sky-400/80 via-white/60 to-cyan-300/80',        // 星空蓝
+  'from-emerald-400/80 via-white/60 to-green-300/80',   // 橄榄绿
+  'from-amber-500/80 via-white/60 to-yellow-400/80',    // 麦田金
+  'from-cyan-400/80 via-white/60 to-blue-300/80',       // 地中海蓝
+  'from-teal-400/80 via-white/60 to-emerald-300/80',    // 柏树绿
+  'from-blue-400/80 via-white/60 to-sky-300/80',        // 夜空蓝
+  'from-emerald-500/80 via-white/60 to-teal-300/80',    // 深绿
+];
+
+// 深色模式渐变色组合 - 梵高夜景色系
+const darkGradients = [
+  'dark:from-sky-600/70 dark:via-zinc-900/80 dark:to-cyan-500/70',        // 深夜蓝
+  'dark:from-emerald-600/70 dark:via-zinc-900/80 dark:to-green-500/70',   // 深沉绿
+  'dark:from-amber-600/60 dark:via-zinc-900/90 dark:to-yellow-500/60',    // 柔和暗金
+  'dark:from-cyan-600/70 dark:via-zinc-900/80 dark:to-blue-500/70',       // 深海蓝
+  'dark:from-teal-600/70 dark:via-zinc-900/80 dark:to-emerald-500/70',    // 夜绿
+  'dark:from-blue-600/70 dark:via-zinc-900/80 dark:to-sky-500/70',        // 星夜蓝
+  'dark:from-emerald-700/70 dark:via-zinc-900/80 dark:to-teal-500/70',    // 暗绿
+];
+
+// 调整渐变位置，减少中间白色区域的范围
+const gradientPositions = [
+  'bg-[length:350%_350%] bg-[position:10%_90%]',
+  'bg-[length:330%_330%] bg-[position:85%_15%]',
+  'bg-[length:370%_370%] bg-[position:25%_75%]',
+  'bg-[length:340%_340%] bg-[position:90%_10%]',
+  'bg-[length:360%_360%] bg-[position:75%_25%]',
+  'bg-[length:345%_345%] bg-[position:20%_80%]',
+  'bg-[length:355%_355%] bg-[position:80%_20%]',
+];
 
 export default function HistoryPage() {
   const router = useRouter();
@@ -55,26 +90,16 @@ export default function HistoryPage() {
       messageText: event.messageText || ''
     }));
 
-    // 构建对话内容
-    const conversation = messages.map(msg => `${msg.role}: ${msg.messageText}`).join('\n');
-    
-    // 使用 Claude 3.5 生成诗句
-    const response = await fetch('/api/generate-poem', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        conversation,
-        chatId: chat.chatId  // 添加 chatId
-      })
-    });
-    
-    const { poem } = await response.json();
-
     const firstEvent = chat.events[0];
     const lastEvent = chat.events[chat.events.length - 1];
     const durationMs = lastEvent.timestamp - firstEvent.timestamp;
     const durationSeconds = Math.floor(durationMs / 1000);
     const duration = `${Math.floor(durationSeconds / 60)}m ${durationSeconds % 60}s`;
+
+    // 如果对话时长不超过15秒，使用固定文字
+    const summary = durationSeconds <= 15 
+      ? "Test is for a better future"
+      : await generateSummary(messages);
 
     const startDate = new Date(firstEvent.timestamp);
     const today = new Date();
@@ -99,9 +124,21 @@ export default function HistoryPage() {
       chatId: chat.chatId,
       startTime: startTimeStr,
       duration,
-      summary: poem,
+      summary,
       messages
     };
+  };
+
+  // 辅助函数：生成摘要（仅在对话时长超过15秒时调用）
+  const generateSummary = async (messages: any[]) => {
+    const conversation = messages.map(msg => `${msg.role}: ${msg.messageText}`).join('\n');
+    const response = await fetch('/api/generate-poem', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ conversation })
+    });
+    const { poem } = await response.json();
+    return poem;
   };
 
   useEffect(() => {
@@ -178,6 +215,7 @@ export default function HistoryPage() {
       "w-full min-h-screen",
       "bg-gray-50 dark:bg-zinc-900",
       "text-zinc-900 dark:text-zinc-100",
+      lora.className  // 添加 Lora 字体到整个页面
     )}>
       <div className={cn(
         "sticky top-0",
@@ -210,15 +248,22 @@ export default function HistoryPage() {
       <div className={cn(
         "flex-1",
         "p-4 md:p-6",
-        "max-w-[800px]",
+        "w-full",
+        "max-w-[1400px]",
         "mx-auto",
-        "w-full"
+        "md:overflow-hidden overflow-auto",
+        "h-[calc(100vh-60px)]"
       )}>
         {isLoading ? (
           <div className="text-center py-8">Loading chat history...</div>
         ) : (
           <>
-            <div className="space-y-3">
+            <div className={cn(
+              "grid gap-6",
+              "grid-cols-1 md:grid-cols-3",
+              "auto-rows-max",
+              "mb-6"
+            )}>
               {formattedChats.map((chat, index) => (
                 <div 
                   key={`chat-${chat.chatId}-${index}`}
@@ -232,75 +277,79 @@ export default function HistoryPage() {
                     "hover:shadow-md hover:border-gray-300 dark:hover:border-zinc-600",
                     "cursor-pointer",
                     "overflow-hidden",
-                    "p-5"
+                    "w-full",
+                    "flex flex-col",
+                    "min-h-[280px]"  // 减小最小高度
                   )}
                   onClick={() => toggleChat(chat.chatId)}
                 >
-                  <div className={cn(
-                    "flex justify-between items-center",
-                    "text-xs",
-                    "text-gray-500 dark:text-gray-400"
-                  )}>
-                    <time>
-                      {chat.startTime}
-                    </time>
-                    <div>
-                      {chat.duration}
-                    </div>
-                  </div>
-                  
-                  <div className={cn(
-                    "mt-3",
-                    "text-base italic",
-                    "text-gray-600 dark:text-gray-400",
-                    "leading-relaxed",
-                    "font-normal"
-                  )}>
-                    {chat.summary}
-                  </div>
-
-                  {expandedChatId === chat.chatId && (
+                  {/* 艺术化的渐变背景 */}
+                  <motion.div 
+                    className={cn(
+                      "w-full h-48",
+                      "rounded-3xl",
+                      "bg-gradient-to-r",
+                      lightGradients[index % lightGradients.length],
+                      darkGradients[index % darkGradients.length],
+                      gradientPositions[index % gradientPositions.length],
+                      "bg-white dark:bg-zinc-900",
+                      "relative overflow-hidden",
+                      "backdrop-filter backdrop-blur-[1px]"  // 添加轻微模糊
+                    )}
+                    whileHover={{ 
+                      scale: 1.02,
+                      boxShadow: "0px 3px 8px rgba(0,0,0,0.1)"
+                    }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    {/* 磨砂玻璃效果层 */}
                     <div className={cn(
-                      "mt-4",
-                      "space-y-4",
-                      "bg-gray-50 dark:bg-zinc-800/50",
-                      "rounded-lg"
+                      "absolute inset-0",
+                      "bg-gradient-to-br from-white/10 via-transparent to-black/5",
+                      "dark:from-white/5 dark:to-black/10",
+                      "mix-blend-overlay",
+                      "backdrop-filter backdrop-blur-[0.5px]"
+                    )} />
+                    
+                    {/* 纹理效果层 */}
+                    <div className={cn(
+                      "absolute inset-0",
+                      "bg-noise",  // 需要在 globals.css 中定义
+                      "opacity-[0.15]",
+                      "mix-blend-overlay"
+                    )} />
+                  </motion.div>
+
+                  <div className={cn(
+                    "p-4",
+                    lora.className  // 确保卡片内容也使用 Lora 字体
+                  )}>
+                    <div className={cn(
+                      "flex justify-between items-center",
+                      "text-sm",
+                      "text-gray-500 dark:text-gray-400"
                     )}>
-                      {chat.messages.map((message, messageIndex) => (
-                        <div 
-                          key={`message-${chat.chatId}-${messageIndex}`}
-                          className={cn(
-                            "p-4",
-                            "transition-colors duration-200",
-                            "rounded-lg",
-                            "bg-gray-100 dark:bg-zinc-700/50"
-                          )}
-                        >
-                          <div className={cn(
-                            "flex items-center gap-2 mb-2",
-                            "text-sm font-medium",
-                            message.role === "User" 
-                              ? "text-blue-600 dark:text-blue-400"
-                              : "text-green-600 dark:text-green-400"
-                          )}>
-                            <span>{message.role}</span>
-                            <span className="text-gray-400 dark:text-gray-500 text-xs">
-                              {message.timestamp}
-                            </span>
-                          </div>
-                          <div className="text-sm whitespace-pre-wrap text-gray-700 dark:text-gray-200">
-                            {message.messageText}
-                          </div>
-                        </div>
-                      ))}
+                      <time>{chat.startTime}</time>
+                      <div>{chat.duration}</div>
                     </div>
-                  )}
+                    
+                    <div className={cn(
+                      "mt-2",
+                      "text-base",
+                      "text-gray-600 dark:text-gray-400",
+                      "leading-relaxed",
+                      "font-normal",
+                      "line-clamp-2"
+                    )}>
+                      {chat.summary}
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>
             
             {hasMore && (
-              <div className="mt-6 text-center">
+              <div className="text-center pb-4 md:sticky md:bottom-0 md:bg-gray-50/80 md:dark:bg-zinc-900/80 md:backdrop-blur-sm">
                 <Button
                   variant="outline"
                   onClick={() => {

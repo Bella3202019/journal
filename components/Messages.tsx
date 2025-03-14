@@ -124,6 +124,7 @@ const Messages = forwardRef<
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
+  const [isExpanded, setIsExpanded] = useState(false);
   
   
   useEffect(() => {
@@ -357,16 +358,29 @@ const Messages = forwardRef<
     >
       {/* History Button */}
       <div 
-        className="absolute left-4 top-4 w-10 h-10 cursor-pointer z-50"
-        onClick={() => router.push('/history')}
+        className="absolute left-4 top-4 cursor-pointer z-50"
+        onClick={() => {
+          setIsExpanded(true);  // 添加展开状态
+          setTimeout(() => {
+            router.push('/history');
+          }, 300);
+        }}
       >
-        <Image
-          src="/history.png"
-          alt="History"
-          width={40}
-          height={40}
-          className="rounded-full hover:opacity-80 transition-opacity"
-        />
+        <motion.div
+          animate={{ 
+            opacity: isExpanded ? 0 : 1,
+            scale: isExpanded ? 0.8 : 1
+          }}
+          transition={{ duration: 0.3 }}
+        >
+          <Image
+            src="/history.png"
+            alt="History"
+            width={40}
+            height={40}
+            className="rounded-full hover:opacity-80 transition-opacity"
+          />
+        </motion.div>
       </div>
 
       {/* Agent的圆 - 一直显示 */}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from 'react';
+import { motion } from 'framer-motion';
 import { 
   getAuth, 
   signOut,
@@ -35,6 +36,7 @@ export default function UserMenu() {
   const [newUsername, setNewUsername] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   const handleSignOut = async () => {
     try {
@@ -65,8 +67,10 @@ export default function UserMenu() {
   };
 
   const handleViewHistory = () => {
-    console.log('Navigating to history page...');
-    router.push('/history');
+    setIsExpanded(true);
+    setTimeout(() => {
+      router.push('/history');
+    }, 300);
   };
 
   if (!user) return null;
@@ -75,26 +79,34 @@ export default function UserMenu() {
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button 
-            variant="outline" 
-            size="icon"
-            className="bg-white/80 dark:bg-zinc-900/80 hover:bg-white/90 overflow-hidden"
+          <motion.div 
+            animate={{ 
+              opacity: isExpanded ? 0 : 1,
+              scale: isExpanded ? 0.8 : 1
+            }}
+            transition={{ duration: 0.3 }}
           >
-            {user.photoURL ? (
-              <Image
-                src={user.photoURL}
-                alt={user.displayName || 'User avatar'}
-                width={24}
-                height={24}
-                className="rounded-full"
-                referrerPolicy="no-referrer"
-              />
-            ) : (
-              <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center text-white">
-                {(user.displayName || user.email || '?')[0].toUpperCase()}
-              </div>
-            )}
-          </Button>
+            <Button 
+              variant="outline" 
+              size="icon"
+              className="bg-white/80 dark:bg-zinc-900/80 hover:bg-white/90 overflow-hidden"
+            >
+              {user.photoURL ? (
+                <Image
+                  src={user.photoURL}
+                  alt={user.displayName || 'User avatar'}
+                  width={24}
+                  height={24}
+                  className="rounded-full"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center text-white">
+                  {(user.displayName || user.email || '?')[0].toUpperCase()}
+                </div>
+              )}
+            </Button>
+          </motion.div>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-56">
           <div className="px-2 py-1.5 text-sm font-medium flex items-center justify-between">
