@@ -36,3 +36,6 @@ package-lock.json
 # Environment files
 .env
 .env*.local
+
+# Firebase Admin SDK
+firebase-admin-key.json

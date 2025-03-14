@@ -12,22 +12,24 @@ export async function storeChatMapping(userId: string, chatId: string) {
       createdAt: new Date()
     });
   } catch (error) {
-    console.error('Error storing chat mapping:', error);
-    throw error;
+    console.error("Error storing chat mapping:", error);
   }
 }
 
-// 获取用户的聊天记录ID列表
+// 获取用户的聊天ID列表
 export async function getUserChatIds(userId: string): Promise<string[]> {
   try {
     const q = query(
-      collection(db, 'chats_mapping'), 
+      collection(db, 'chats_mapping'),
       where('userId', '==', userId)
     );
+    
     const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => doc.data().chatId);
+    const chatIds = querySnapshot.docs.map(doc => doc.data().chatId);
+    
+    return chatIds;
   } catch (error) {
-    console.error('Error getting user chat IDs:', error);
+    console.error("Error getting chat IDs:", error);
     return [];
   }
 }

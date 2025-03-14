@@ -1,6 +1,5 @@
 "use client";
 
-
 import { useEffect, useState } from 'react';
 import { HumeService } from '@/lib/hume';
 import { cn } from "@/utils";
@@ -13,9 +12,16 @@ import { getAuth } from 'firebase/auth';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { app } from '@/lib/firebase';
 import { getUserChatIds } from '@/lib/db';
+import { Lora } from 'next/font/google';
 
 const AuthButton = dynamic(() => import("@/components/AuthButton"), {
   ssr: false,
+});
+
+// 配置 Lora 字体
+const lora = Lora({
+  subsets: ['latin'],
+  display: 'swap',
 });
 
 interface FormattedChat {
@@ -23,12 +29,25 @@ interface FormattedChat {
   startTime: string;
   duration: string;
   summary: string;
+  imagePath: string;
   messages: {
     role: string;
     timestamp: string;
     messageText: string;
   }[];
 }
+
+// 获取随机图片的函数
+const getRandomHistoryImage = () => {
+  const images = [
+    '1_green.PNG',
+    '2_blue.PNG',
+    '3_yellow.PNG',
+    '4_lightblue.PNG',
+    // ... 添加所有图片名称
+  ];
+  return `/history/${images[Math.floor(Math.random() * images.length)]}`;
+};
 
 export default function HistoryPage() {
   const router = useRouter();
@@ -41,7 +60,7 @@ export default function HistoryPage() {
   // 分页相关状态
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
-  const CHATS_PER_PAGE = 10;
+  const CHATS_PER_PAGE = 9;
   const [allChats, setAllChats] = useState<any[]>([]);
 
   const formatChatEvents = async (chat: { chatId: string; events: ReturnChatEvent[] }): Promise<FormattedChat> => {
@@ -55,26 +74,16 @@ export default function HistoryPage() {
       messageText: event.messageText || ''
     }));
 
-    // 构建对话内容
-    const conversation = messages.map(msg => `${msg.role}: ${msg.messageText}`).join('\n');
-    
-    // 使用 Claude 3.5 生成诗句
-    const response = await fetch('/api/generate-poem', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        conversation,
-        chatId: chat.chatId  // 添加 chatId
-      })
-    });
-    
-    const { poem } = await response.json();
-
     const firstEvent = chat.events[0];
     const lastEvent = chat.events[chat.events.length - 1];
     const durationMs = lastEvent.timestamp - firstEvent.timestamp;
     const durationSeconds = Math.floor(durationMs / 1000);
-    const duration = `${Math.floor(durationSeconds / 60)}m ${durationSeconds % 60}s`;
+    const minutes = Math.floor(durationSeconds / 60);
+    const seconds = durationSeconds % 60;
+    
+    const duration = minutes > 0 
+      ? `${minutes}m ${seconds}s`
+      : `${seconds}s`;
 
     const startDate = new Date(firstEvent.timestamp);
     const today = new Date();
@@ -95,11 +104,35 @@ export default function HistoryPage() {
       });
     }
 
+    let poem: string;
+    
+    try {
+      // 使用 generate-poem API（它会处理缓存逻辑）
+      const conversation = messages.map(msg => `${msg.role}: ${msg.messageText}`).join('\n');
+      
+      const response = await fetch('/api/generate-poem', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          conversation,
+          chatId: chat.chatId
+        })
+      });
+      
+      const { poem: newPoem } = await response.json();
+      poem = newPoem || "Time flows like river's song";
+      
+    } catch (error) {
+      console.error('Error generating poem:', error);
+      poem = "Time flows like river's song";
+    }
+
     return {
       chatId: chat.chatId,
       startTime: startTimeStr,
       duration,
       summary: poem,
+      imagePath: getRandomHistoryImage(),
       messages
     };
   };
@@ -112,25 +145,26 @@ export default function HistoryPage() {
       }
 
       try {
-        // 1. 获取用户的聊天ID列表
-        const userChatIds = await getUserChatIds(user.uid);
+        // 1. 从 API 获取用户的聊天ID列表
+        const chatIdsResponse = await fetch(`/api/user-chats?userId=${user.uid}`);
+        const { chatIds } = await chatIdsResponse.json();
+        
+        if (!chatIds) {
+          throw new Error('Failed to fetch chat IDs');
+        }
         
         // 2. 获取所有聊天
-        const chatsResponse = await HumeService.listChats();
+        const chatsResponse = await fetch('/api/hume/chats');
+        const chatsData = await chatsResponse.json();
         
         // 3. 过滤出用户的聊天并按时间排序
-        const userChats = chatsResponse.data
-          .filter(chat => userChatIds.includes(chat.id))
-          .sort((a, b) => {
-            // 添加空值检查，如果没有 endTimestamp 则使用当前时间
-            const timeA = a.endTimestamp ? new Date(a.endTimestamp).getTime() : Date.now();
-            const timeB = b.endTimestamp ? new Date(b.endTimestamp).getTime() : Date.now();
-            return timeB - timeA;
-          });
+        const userChats = chatsData.chats_page
+          .filter((chat: any) => chatIds.includes(chat.id))
+          .sort((a: any, b: any) => b.start_timestamp - a.start_timestamp);
 
         setAllChats(userChats);
         
-        // 4. 只获取第一页的聊天事件
+        // 4. 只获取前9个聊天事件
         await loadMoreChats(userChats);
       } catch (error) {
         console.error('Error fetching history:', error);
@@ -154,10 +188,11 @@ export default function HistoryPage() {
 
     // 获取当前页的聊天事件
     const chatsWithEventsPromises = currentPageChats.map(async (chat) => {
-      const events = await HumeService.getChatEvents(chat.id);
+      const eventsResponse = await fetch(`/api/hume/chat-events?chatId=${chat.id}`);
+      const events = await eventsResponse.json();
       return {
         chatId: chat.id,
-        events
+        events: events.data
       };
     });
 
@@ -174,6 +209,7 @@ export default function HistoryPage() {
 
   return (
     <main className={cn(
+      lora.className,
       "flex flex-col",
       "w-full min-h-screen",
       "bg-gray-50 dark:bg-zinc-900",
@@ -210,7 +246,7 @@ export default function HistoryPage() {
       <div className={cn(
         "flex-1",
         "p-4 md:p-6",
-        "max-w-[800px]",
+        "max-w-[80%]",
         "mx-auto",
         "w-full"
       )}>
@@ -218,66 +254,79 @@ export default function HistoryPage() {
           <div className="text-center py-8">Loading chat history...</div>
         ) : (
           <>
-            <div className="space-y-3">
+            <div className={cn(
+              "grid",
+              "grid-cols-1 md:grid-cols-3",
+              "gap-4 md:gap-6"
+            )}>
               {formattedChats.map((chat, index) => (
                 <div 
                   key={`chat-${chat.chatId}-${index}`}
                   className={cn(
                     "group",
-                    "bg-white dark:bg-zinc-800",
+                    "backdrop-blur-sm",
+                    "bg-white/30 dark:bg-zinc-800/30",
                     "rounded-xl",
-                    "border dark:border-zinc-700",
+                    "border border-gray-200/50 dark:border-zinc-700/50",
                     "shadow-sm",
                     "transition-all duration-200",
-                    "hover:shadow-md hover:border-gray-300 dark:hover:border-zinc-600",
+                    "hover:shadow-md hover:border-gray-300/70 dark:hover:border-zinc-600/70",
                     "cursor-pointer",
-                    "overflow-hidden",
-                    "p-5"
+                    "overflow-hidden"
                   )}
                   onClick={() => toggleChat(chat.chatId)}
                 >
-                  <div className={cn(
-                    "flex justify-between items-center",
-                    "text-xs",
-                    "text-gray-500 dark:text-gray-400"
-                  )}>
-                    <time>
-                      {chat.startTime}
-                    </time>
-                    <div>
-                      {chat.duration}
-                    </div>
-                  </div>
-                  
-                  <div className={cn(
-                    "mt-3",
-                    "text-base italic",
-                    "text-gray-600 dark:text-gray-400",
-                    "leading-relaxed",
-                    "font-normal"
-                  )}>
-                    {chat.summary}
+                  {/* 图片部分 */}
+                  <div className="relative overflow-hidden bg-transparent">
+                    <img
+                      src={chat.imagePath}
+                      alt="Conversation Memory"
+                      className="w-full object-contain block rounded-t-xl"
+                      style={{ verticalAlign: 'bottom' }}
+                    />
                   </div>
 
+                  {/* 内容部分 */}
+                  <div className="p-4 bg-white/30 dark:bg-zinc-800/30 backdrop-blur-sm">
+                    <div className={cn(
+                      "flex justify-between items-center",
+                      "text-xs",
+                      "text-gray-600 dark:text-gray-300",
+                      "mb-3"
+                    )}>
+                      <time>{chat.startTime}</time>
+                      <div>{chat.duration}</div>
+                    </div>
+                    
+                    <div className={cn(
+                      "text-sm",
+                      "text-gray-700 dark:text-gray-200",
+                      "leading-relaxed",
+                      "line-clamp-3",
+                      "font-normal"
+                    )}>
+                      {chat.summary}
+                    </div>
+                  </div>
+
+                  {/* 展开的对话内容 */}
                   {expandedChatId === chat.chatId && (
                     <div className={cn(
-                      "mt-4",
-                      "space-y-4",
-                      "bg-gray-50 dark:bg-zinc-800/50",
-                      "rounded-lg"
+                      "p-4",
+                      "border-t border-gray-200/50 dark:border-zinc-700/50",
+                      "mt-2",
+                      "bg-white/30 dark:bg-zinc-800/30 backdrop-blur-sm"
                     )}>
                       {chat.messages.map((message, messageIndex) => (
                         <div 
                           key={`message-${chat.chatId}-${messageIndex}`}
                           className={cn(
-                            "p-4",
-                            "transition-colors duration-200",
-                            "rounded-lg",
-                            "bg-gray-100 dark:bg-zinc-700/50"
+                            "py-3",
+                            "border-b last:border-0 dark:border-zinc-700"
                           )}
                         >
                           <div className={cn(
-                            "flex items-center gap-2 mb-2",
+                            "flex items-center gap-2 mb-1",
                             "text-sm font-medium",
                             message.role === "User" 
                               ? "text-blue-600 dark:text-blue-400"
@@ -288,7 +337,7 @@ export default function HistoryPage() {
                               {message.timestamp}
                             </span>
                           </div>
-                          <div className="text-sm whitespace-pre-wrap text-gray-700 dark:text-gray-200">
+                          <div className="text-sm text-gray-700 dark:text-gray-200">
                             {message.messageText}
                           </div>
                         </div>

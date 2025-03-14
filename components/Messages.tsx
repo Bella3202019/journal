@@ -803,7 +803,8 @@ const Messages = forwardRef<
                 const position = getMessagePosition(index, msg.type, scrollY);
 
                 if (!visibleMessages[messageKey] || !position || !('message' in msg)) return null;
-
+                
+                // here's the front end code for the message component
                 return (
                   <motion.div
                     key={messageKey}
