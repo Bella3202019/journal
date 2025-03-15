@@ -97,7 +97,7 @@ export class HumeService {
   }
 
   // 获取用户的聊天记录
-  static async listUserChats(userId: string, page: number = 0, pageSize: number = 20) {
+  static async listUserChats(userId: string, page: number = 0, pageSize: number = 9) {
     try {
       // 获取用户的聊天ID列表
       const userChatIds = await getUserChatIds(userId);

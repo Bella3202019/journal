@@ -103,7 +103,7 @@ export default function HistoryPage() {
     // 如果对话时长不超过15秒，使用固定文字
     const summary = durationSeconds <= 15 
       ? "Test is for a better future"
-      : await generateSummary(messages);
+      : await generateSummary(messages, chat.chatId);
 
     // 修改日期显示格式
     const startDate = new Date(firstEvent.timestamp);
@@ -135,12 +135,15 @@ export default function HistoryPage() {
   };
 
   // 辅助函数：生成摘要（仅在对话时长超过15秒时调用）
-  const generateSummary = async (messages: any[]) => {
+  const generateSummary = async (messages: any[], chatId: string) => {
     const conversation = messages.map(msg => `${msg.role}: ${msg.messageText}`).join('\n');
     const response = await fetch('/api/generate-poem', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ conversation })
+      body: JSON.stringify({ 
+        conversation,
+        chatId 
+      })
     });
     const { poem } = await response.json();
     return poem;
@@ -214,6 +217,10 @@ export default function HistoryPage() {
     setExpandedChatId(expandedChatId === chatId ? null : chatId);
   };
 
+  const handleCardClick = (chatId: string) => {
+    router.push(`/history/${chatId}`);
+  };
+
   return (
     <main className={cn(
       "flex flex-col",
@@ -271,8 +278,8 @@ export default function HistoryPage() {
               {formattedChats.map((chat, index) => (
                 <div 
                   key={`chat-${chat.chatId}-${index}`}
-                  className="w-full px-1"  // 简化容器样式
-                  onClick={() => toggleChat(chat.chatId)}
+                  className="w-full px-1 cursor-pointer"  // 添加 cursor-pointer
+                  onClick={() => handleCardClick(chat.chatId)}  // 添加点击事件
                 >
                   <motion.div 
                     className={cn(

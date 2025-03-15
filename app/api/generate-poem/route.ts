@@ -10,24 +10,12 @@ export async function POST(request: Request) {
   try {
     const { conversation, chatId } = await request.json();
     
-    // 检查是否只有一条消息
-    const messageCount = (conversation.match(/\n/g) || []).length;
-    if (messageCount <= 1) {
-      return new Response(JSON.stringify({ 
-        poem: "Silence holds stories untold",
-        source: 'default'
-      }), {
-        headers: { 'Content-Type': 'application/json' },
-      });
+    if (!chatId) {
+      throw new Error('Missing chatId');
     }
 
-    if (!chatId || !conversation) {
-      return new Response(JSON.stringify({ 
-        poem: "Whispers echo in empty space",
-        source: 'default'
-      }), {
-        headers: { 'Content-Type': 'application/json' },
-      });
+    if (!conversation) {
+      throw new Error('Missing conversation content');
     }
 
     const apiKey = process.env.CLAUDE_API_KEY;
@@ -35,45 +23,36 @@ export async function POST(request: Request) {
       throw new Error('CLAUDE_API_KEY is not configured');
     }
 
-    const poemRef = adminDb.collection('poems').doc(chatId);
-    
-    try {
-      const poemDoc = await poemRef.get();
-      if (poemDoc.exists) {
-        return new Response(JSON.stringify({ 
-          poem: poemDoc.data()?.text,
-          source: 'cache'
-        }), {
-          headers: { 'Content-Type': 'application/json' },
-        });
-      }
-    } catch (error) {
-      throw new Error('Database connection failed');
-    }
+    const anthropic = new Anthropic({
+      apiKey: apiKey
+    });
 
+    console.log('Calling Claude API...');
     try {
-      const anthropic = new Anthropic({
-        apiKey: apiKey
-      });
-
       const response = await anthropic.messages.create({
         model: "claude-3-opus-20240229",
         max_tokens: 100,
         temperature: 0.7,
         messages: [{
           role: "user",
-          content: `Create a very short, single line of poetic verse (maximum 20 characters) that captures the essence of this conversation between User and Dela. Focus on:
+          content: `Create a poetic and philosophical phrase that captures the deep meaning of this conversation. 
+The phrase should be beautiful and thought-provoking, similar to these examples:
+- "To be unfree is to be unnatural"
+- "Love is a self-education"
+- "Life flows like river dreams"
 
-1. The user's core emotions and feelings
-2. Key thoughts or reflections
-3. The emotional journey
+1. The main emotion or feeling expressed
+2. A key insight or realization
+3. The overall mood or atmosphere
 
 Here's the conversation:
 ${conversation}
 
-Important: Return ONLY ONE line of verse, no more than 20 characters, with no line breaks or explanations.`
+Important: Return only ONE clear poetic phrase (4-8 words). No punctuation, no explanation.`
         }]
       });
+
+      console.log('Claude API response received:', response);
 
       if (!response.content[0] || response.content[0].type !== 'text') {
         throw new Error('Invalid response format from Claude');
@@ -83,16 +62,8 @@ Important: Return ONLY ONE line of verse, no more than 20 characters, with no li
         .trim()
         .split('\n')[0]
         .replace(/[\r\n]/g, '');
-      
-      if (poem.length > 20) {
-        poem = "Time flows like river's song";
-      }
 
-      await poemRef.set({
-        text: poem,
-        createdAt: new Date().toISOString(),
-        chatId
-      });
+      console.log('Generated poem:', poem);
 
       return new Response(JSON.stringify({ 
         poem,
@@ -101,16 +72,19 @@ Important: Return ONLY ONE line of verse, no more than 20 characters, with no li
         headers: { 'Content-Type': 'application/json' },
       });
 
-    } catch (error) {
-      throw new Error('Claude API call failed');
+    } catch (apiError: any) {
+      console.error('Claude API error:', apiError);
+      throw new Error(apiError?.message || 'Unknown Claude API error');
     }
-    
-  } catch (error) {
+
+  } catch (error: any) {
+    console.error('Full error details:', error);
     return new Response(JSON.stringify({ 
-      poem: "Time flows like river's song",
-      error: error instanceof Error ? error.message : 'Unknown error'
+      error: error?.message || 'Unknown error occurred',
+      source: 'error',
+      details: error?.stack
     }), {
-      status: 200,
+      status: 400,
       headers: { 'Content-Type': 'application/json' },
     });
   }
