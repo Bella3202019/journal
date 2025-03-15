@@ -642,7 +642,7 @@ const Messages = forwardRef<
         )}
         style={{
           left: '50%',
-          top: isMobile ? '55%' : '60%',  // 只调整移动端位置
+          top: isMobile ? '35%' : '60%',  // 只调整移动端位置
           transform: isMobile ? 'translate(-50%, 0) scale(0.6)' : 'translate(-50%, 0)',
           zIndex: 998,
         }}
@@ -652,13 +652,13 @@ const Messages = forwardRef<
 
       {/* User的圆形 */}
       <motion.div
-        className="absolute pointer-events-none overflow-hidden"
+        className="fixed pointer-events-none overflow-hidden"
         style={{
           left: '50%',
           transform: 'translateX(-50%)',
           width: isMobile ? '1200px' : '2000px',
-          height: '100vh',  // 限制为视口高度
-          top: isMobile ? '60vh' : '60vh',
+          height: '100vh',
+          bottom: '-55vh',
           display: 'flex',
           alignItems: 'flex-start',
           justifyContent: 'center',
@@ -813,27 +813,22 @@ const Messages = forwardRef<
         className={cn(
           "w-full",
           "relative z-10",
-          "overflow-hidden",  // 改为 hidden 禁用所有滚动
-          "h-screen",
+          "overflow-y-auto",
+          "h-[calc(100vh-100px)]",  // 固定高度，留出底部空间
           "pb-24",
           "px-[300px] md:px-[400px]",
           "bg-white dark:bg-black",
           lora.className
         )}
         style={{
-          height: '100vh',
-          maxHeight: '100vh',
-          position: 'fixed',  // 固定定位防止滚动
-          top: 0,
-          left: 0,
-          right: 0,
+          position: 'relative',
         }}
       >
         <div 
           className="relative w-full" 
           style={{
-            height: '100vh',
-            overflow: 'hidden',  // 确保内部也不会滚动
+            minHeight: '100vh',
+            overflow: 'visible', // 改为 visible
           }}
         >
           <AnimatePresence mode="popLayout">
