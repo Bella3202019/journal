@@ -221,19 +221,18 @@ const Messages = forwardRef<
       y: window.innerHeight * 0.5
     };
     
-    const messageWidth = window.innerWidth < 640 ? 260 : 300;
-    const verticalSpacing = 1.1;
+    const messageWidth = isMobile ? 220 : 300; // 移动端减小消息宽度
+    const verticalSpacing = isMobile ? 1.05 : 1.1; // 移动端减小垂直间距
     
     if (type === "assistant_message") {
-      const x = Math.max(20, waveCenter.x - messageWidth + (standardHeight * 0.5));
+      const x = Math.max(10, waveCenter.x - messageWidth + (standardHeight * 0.5));
       const y = (index * standardHeight * verticalSpacing);
       return { x, y };
     } else {
       const x = Math.min(
-        window.innerWidth - messageWidth - 20,
+        window.innerWidth - messageWidth - 10,
         waveCenter.x + (standardHeight * 0.5)
       );
-      
       const y = (index * standardHeight * verticalSpacing);
       return { x, y };
     }
@@ -594,19 +593,23 @@ const Messages = forwardRef<
       {status.value === "connected" && (
         <div
           className={cn(
-            "fixed text-center pointer-events-none",
+            "absolute text-center pointer-events-none",
             "text-black/70 dark:text-white/70",
             lora.className
           )}
           style={{
+            position: 'absolute',
             left: '50%',
-            top: '29%',
+            bottom: '88vh', // 调整到 agent 圆的位置
             transform: 'translateX(-50%)',
-            fontSize: '1rem',
+            fontSize: isMobile ? '0.9rem' : '1rem',
             fontWeight: 500,
-            zIndex: 1100,
             color: 'rgba(255, 255, 255, 0.8)',
             textShadow: '0 0 10px rgba(255, 255, 255, 0.3)',
+            letterSpacing: '0.05em',
+            width: '100%',
+            textAlign: 'center',
+            zIndex: 1100,
           }}
         >
           {getAgentStatus()}
@@ -814,14 +817,15 @@ const Messages = forwardRef<
           "w-full",
           "relative z-10",
           "overflow-y-auto",
-          "h-[calc(100vh-100px)]",  // 固定高度，留出底部空间
+          "h-[calc(100vh-180px)]", // 移动端留更多空间
           "pb-24",
-          "px-[300px] md:px-[400px]",
+          "px-4 md:px-[300px]", // 移动端减小左右padding
           "bg-white dark:bg-black",
           lora.className
         )}
         style={{
           position: 'relative',
+          marginTop: isMobile ? '35vh' : '20vh', // 移动端增加顶部边距
         }}
       >
         <div 
