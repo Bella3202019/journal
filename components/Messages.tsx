@@ -413,27 +413,17 @@ const Messages = forwardRef<
                   cx="87" 
                   cy="87" 
                   r="70" 
-                  className="dark:opacity-100 opacity-60"  // 添加明暗模式透明度调整
-                  fill={`url(#agentGradient)`}
+                  className="dark:opacity-100 opacity-60"
+                  fill="url(#agentGradient)"
                 />
               </g>
-              {/* 添加一个额外的发光效果，移除了外框 */}
+              {/* 移除了锥形渐变的圆形，只保留发光效果 */}
               <g filter="url(#agentGlow)">
                 <circle 
                   cx="87" 
                   cy="87" 
                   r="78" 
                   style={{
-                    fill: `conic-gradient(
-                      from -90deg,
-                      ${agentEmotionColors[0]} 0deg,
-                      ${agentEmotionColors[0]} 120deg,
-                      ${agentEmotionColors[1]} 120deg,
-                      ${agentEmotionColors[1]} 240deg,
-                      ${agentEmotionColors[2]} 240deg,
-                      ${agentEmotionColors[2]} 360deg
-                    )`,
-                    filter: 'blur(0px)',
                     opacity: isPlaying ? 0.8 : 0.4,
                     transition: 'opacity 0.3s ease',
                     mixBlendMode: 'soft-light'
@@ -492,7 +482,7 @@ const Messages = forwardRef<
           {[1, 2, 3].map((index) => (
             <motion.div
               key={index}
-              initial={{ scale: 0.4, opacity: 0.8 }}  // 起始比例设为 0.4
+              initial={{ scale: 0.7, opacity: 0.8 }}  // 起始比例设为 0.4
               animate={{ 
                 scale: [0.75, 1],    // 从 40% 开始扩散到 100%
                 opacity: [0.8, 0],
@@ -690,50 +680,30 @@ const Messages = forwardRef<
                 const angle = (i * Math.PI * 2) / 540;
                 const baseRadius = 800;
                 const rawVolume = micFft ? micFft.reduce((a, b) => a + b, 0) / 100 : 0;
-                const volume = Math.min(1, rawVolume * 0.7 + (rawVolume > 0 ? 0.3 : 0));
+                // 调整音量响应曲线，使其更平滑
+                const volume = Math.min(1, rawVolume * 0.8 + (rawVolume > 0 ? 0.2 : 0));
                 const time = Date.now();
                 
-                // 基础海浪 - 大的波浪运动
-                const oceanWaves = [
-                  Math.sin(angle * 2 + time / 5000) * 3 * (volume * 0.7 + 1),  // 缓慢的主要波浪
-                  Math.sin(angle * 1.5 + time / 4500) * 2.5 * (volume * 0.7 + 1),  // 次要波浪
-                ];
+                // 主要波浪 - 更宽更优雅的波动
+                const mainWave = 
+                  Math.sin(angle * 0.8 + time / 5000) * 12 * (volume * 1.2 + 0.5) + // 基础波形，降低频率，增加振幅
+                  Math.sin(angle * 0.4 + time / 7000) * 8 * (volume * 1.0 + 0.3);  // 次要波形，更慢的波动
                 
-                // 表面波纹 - 较小的快速波动
-                const ripples = [
-                  Math.sin(angle * 8 + time / 2000) * 0.8 * (volume * 0.7 + 1),
-                  Math.sin(angle * 6 + time / 2200) * 0.6 * (volume * 0.7 + 1),
-                  Math.sin(angle * 10 + time / 1800) * 0.5 * (volume * 0.7 + 1),
-                  Math.sin(angle * 7 + time / 2400) * 0.7 * (volume * 0.7 + 1),
-                  Math.sin(angle * 9 + time / 2100) * 0.4 * (volume * 0.7 + 1),
-                ];
+                // 添加平滑的起伏
+                const smoothWave = 
+                  Math.sin(angle * 0.2 + time / 8000) * 5 * (volume * 0.8 + 0.2);  // 非常缓慢的波动
                 
-                const volumeFactor = Math.pow(volume, 1.5);
-                // 音量驱动的波浪 - 模拟涌浪
-                const volumeWaves = volume > 0.2 ? [
-                  Math.sin(angle * 4 + time / 3000 + Math.sin(time / 8000) * 2) * 2 * volumeFactor * 2.5,
-                  Math.sin(angle * 3 + time / 3500 + Math.sin(time / 7000) * 2) * 1.8 * volumeFactor * 2.5,
-                  Math.sin(angle * 5 + time / 3200 + Math.sin(time / 9000) * 2) * 1.6 * volumeFactor * 2.5,
-                ] : [];
+                // 音量驱动的上扬效果 - 更平滑的过渡
+                const volumeEffect = volume > 0.1 ? 
+                  Math.pow(Math.max(0, Math.sin(angle - Math.PI/2)), 2) * // 使用平方使过渡更平滑
+                  20 * Math.pow(volume, 1.8) : 0; // 增加音量影响
                 
-                // 高音量波浪 - 模拟浪花
-                const highVolumeWaves = volume > 0.5 ? [
-                  Math.sin(angle * 12 + time / 1500) * 1.2 * volumeFactor * 3,
-                  Math.sin(angle * 15 + time / 1200) * 1 * volumeFactor * 3,
-                  Math.sin(angle * 14 + time / 1300) * 0.8 * volumeFactor * 3,
-                  // 添加随机性模拟浪花飞溅
-                  Math.sin(angle * 20 + time / 1000) * Math.random() * volumeFactor * 2,
-                ] : [];
-                
-                // 组合所有波浪并添加缓慢的整体起伏
-                const allWaves = [
-                  ...oceanWaves, 
-                  ...ripples, 
-                  ...volumeWaves, 
-                  ...highVolumeWaves
-                ];
-                const variance = allWaves.reduce((sum, wave) => sum + wave, 0) 
-                  + Math.sin(angle * 0.5 + time / 10000) * 5; // 缓慢的整体起伏
+                // 组合所有效果
+                const variance = 
+                  mainWave + 
+                  smoothWave +
+                  volumeEffect +
+                  Math.sin(angle * 0.3 + time / 10000) * 4; // 更缓慢的整体起伏
                 
                 const x = Math.cos(angle) * (baseRadius + variance);
                 const y = Math.sin(angle) * (baseRadius + variance);
@@ -760,44 +730,25 @@ const Messages = forwardRef<
                   const angle = (i * Math.PI * 2) / 540;
                   const baseRadius = 800;
                   const rawVolume = micFft ? micFft.reduce((a, b) => a + b, 0) / 100 : 0;
-                  const volume = Math.min(1, rawVolume * 0.7 + (rawVolume > 0 ? 0.3 : 0));
+                  const volume = Math.min(1, rawVolume * 0.8 + (rawVolume > 0 ? 0.2 : 0));
                   const time = Date.now();
                   
-                  const oceanWaves = [
-                    Math.cos(angle * 2 + time / 5000) * 3 * (volume * 0.7 + 1),
-                    Math.cos(angle * 1.5 + time / 4500) * 2.5 * (volume * 0.7 + 1),
-                  ];
+                  const mainWave = 
+                    Math.sin(angle * 1 + time / 5000) * 16 * (volume * 1.2 + 0.5) + // 基础波形，降低频率，增加振幅
+                    Math.sin(angle * 0.6 + time / 7000) * 10 * (volume * 1.0 + 0.3);  // 次要波形，更慢的波动
                   
-                  const ripples = [
-                    Math.cos(angle * 8 + time / 2000) * 0.8 * (volume * 0.7 + 1),
-                    Math.cos(angle * 6 + time / 2200) * 0.6 * (volume * 0.7 + 1),
-                    Math.cos(angle * 10 + time / 1800) * 0.5 * (volume * 0.7 + 1),
-                    Math.cos(angle * 7 + time / 2400) * 0.7 * (volume * 0.7 + 1),
-                    Math.cos(angle * 9 + time / 2100) * 0.4 * (volume * 0.7 + 1),
-                  ];
+                  const smoothWave = 
+                    Math.sin(angle * 0.3 + time / 8000) * 8 * (volume * 0.8 + 0.2);  // 非常缓慢的波动
                   
-                  const volumeFactor = Math.pow(volume, 1.5);
-                  const volumeWaves = volume > 0.2 ? [
-                    Math.cos(angle * 4 + time / 3000 + Math.cos(time / 8000) * 2) * 2 * volumeFactor * 2.5,
-                    Math.cos(angle * 3 + time / 3500 + Math.cos(time / 7000) * 2) * 1.8 * volumeFactor * 2.5,
-                    Math.cos(angle * 5 + time / 3200 + Math.cos(time / 9000) * 2) * 1.6 * volumeFactor * 2.5,
-                  ] : [];
+                  const volumeEffect = volume > 0.1 ? 
+                    Math.pow(Math.max(0, Math.sin(angle - Math.PI/2)), 2) * // 使用平方使过渡更平滑
+                    22 * Math.pow(volume, 1.8) : 0; // 增加音量影响
                   
-                  const highVolumeWaves = volume > 0.5 ? [
-                    Math.cos(angle * 12 + time / 1500) * 1.2 * volumeFactor * 3,
-                    Math.cos(angle * 15 + time / 1200) * 1 * volumeFactor * 3,
-                    Math.cos(angle * 14 + time / 1300) * 0.8 * volumeFactor * 3,
-                    Math.cos(angle * 20 + time / 1000) * Math.random() * volumeFactor * 2,
-                  ] : [];
-                  
-                  const allWaves = [
-                    ...oceanWaves, 
-                    ...ripples, 
-                    ...volumeWaves, 
-                    ...highVolumeWaves
-                  ];
-                  const variance = allWaves.reduce((sum, wave) => sum + wave, 0)
-                    + Math.cos(angle * 0.5 + time / 10000) * 5;
+                  const variance = 
+                    mainWave + 
+                    smoothWave +
+                    volumeEffect +
+                    Math.sin(angle * 0.3 + time / 10000) * 4; // 更缓慢的整体起伏
                   
                   const x = Math.cos(angle) * (baseRadius + variance);
                   const y = Math.sin(angle) * (baseRadius + variance);
