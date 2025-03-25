@@ -476,7 +476,6 @@ export default function HistoryPage() {
                     className="w-full px-1"
                   >
                     {chat ? (
-                      // 已加载完成的卡片
                       <motion.div
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
@@ -536,25 +535,66 @@ export default function HistoryPage() {
                             {chat.summary}
                           </p>
                         </div>
+                        
+                        {expandedChatId === chat.chatId && (
+                          <motion.div 
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: "auto" }}
+                            transition={{ duration: 0.3 }}
+                            className="mt-4 bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden"
+                          >
+                            <div className="p-4 space-y-3">
+                              {chat.messages.map((message, msgIndex) => (
+                                <div
+                                  key={msgIndex}
+                                  className={`flex flex-col ${
+                                    message.role === 'User' ? 'items-end' : 'items-start'
+                                  }`}
+                                >
+                                  <div
+                                    className={`max-w-[85%] rounded-lg p-3 ${
+                                      message.role === 'User'
+                                        ? 'bg-blue-500 text-white'
+                                        : 'bg-gray-100 dark:bg-gray-700'
+                                    }`}
+                                  >
+                                    <div className="text-xs font-medium mb-1">
+                                      {message.role}
+                                    </div>
+                                    <div className="text-sm break-words">
+                                      {message.messageText}
+                                    </div>
+                                    <div className="text-[10px] opacity-70 mt-1">
+                                      {message.timestamp}
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </motion.div>
+                        )}
                       </motion.div>
                     ) : (
-                      // 更精细的占位卡片，显示加载状态
                       <motion.div
                         className={cn(
                           "w-full h-48 rounded-3xl",
                           "relative overflow-hidden",
-                          "bg-gray-100 dark:bg-gray-800",
-                          isLoading ? "animate-pulse" : ""
+                          "bg-gradient-to-r from-gray-100 via-gray-200 to-gray-100",
+                          "dark:from-gray-800 dark:via-gray-700 dark:to-gray-800",
+                          "bg-[length:200%_100%]",
+                          "animate-[shimmer_2.5s_ease-in-out_infinite]"
                         )}
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         transition={{ duration: 0.3 }}
                       >
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <div className="text-sm text-gray-400">
-                            {isLoading ? "Loading..." : "Preparing..."}
+                        {isLoading && (
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <div className="text-sm text-gray-400">
+                              Loading...
+                            </div>
                           </div>
-                        </div>
+                        )}
                       </motion.div>
                     )}
                   </div>
