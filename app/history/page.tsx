@@ -73,6 +73,17 @@ interface CachedChat extends FormattedChat {
   timestamp: number;
 }
 
+// 添加一个全局缓存来存储已加载的页面数据
+const PAGE_CACHE_KEY = 'chat_history_page_cache';
+const PAGE_CACHE_EXPIRY = 1000 * 60 * 5; // 5分钟过期
+
+interface PageCache {
+  timestamp: number;
+  allChats: any[];
+  readyChats: FormattedChat[];
+  page: number;
+}
+
 export default function HistoryPage() {
   const router = useRouter();
   const auth = getAuth(app);
@@ -125,6 +136,36 @@ export default function HistoryPage() {
       );
     } catch (error) {
       console.error('Error writing to cache:', error);
+    }
+  }, []);
+
+  // 添加页面缓存检查
+  const checkPageCache = useCallback((): PageCache | null => {
+    try {
+      const cached = localStorage.getItem(PAGE_CACHE_KEY);
+      if (cached) {
+        const parsedCache = JSON.parse(cached);
+        if (Date.now() - parsedCache.timestamp < PAGE_CACHE_EXPIRY) {
+          return parsedCache;
+        }
+        localStorage.removeItem(PAGE_CACHE_KEY);
+      }
+    } catch (error) {
+      console.error('Error reading page cache:', error);
+    }
+    return null;
+  }, []);
+
+  // 更新页面缓存
+  const updatePageCache = useCallback((data: Omit<PageCache, 'timestamp'>) => {
+    try {
+      const cacheData = {
+        ...data,
+        timestamp: Date.now()
+      };
+      localStorage.setItem(PAGE_CACHE_KEY, JSON.stringify(cacheData));
+    } catch (error) {
+      console.error('Error updating page cache:', error);
     }
   }, []);
 
@@ -237,6 +278,7 @@ export default function HistoryPage() {
 
   const [initialLoading, setInitialLoading] = useState(true);
 
+  // 修改 useEffect 以使用页面缓存
   useEffect(() => {
     async function fetchHistory() {
       if (!user) {
@@ -246,13 +288,22 @@ export default function HistoryPage() {
 
       try {
         setInitialLoading(true);
-        // 1. 获取用户的聊天ID列表
-        const userChatIds = await getUserChatIds(user.uid);
         
-        // 2. 获取所有聊天
+        // 检查页面缓存
+        const pageCache = checkPageCache();
+        if (pageCache) {
+          setAllChats(pageCache.allChats);
+          setReadyChats(pageCache.readyChats);
+          setPage(pageCache.page);
+          setInitialLoading(false);
+          setHasMore(pageCache.allChats.length > pageCache.readyChats.length);
+          return;
+        }
+
+        // 如果没有缓存，执行正常加载流程
+        const userChatIds = await getUserChatIds(user.uid);
         const chatsResponse = await HumeService.listChats();
         
-        // 3. 过滤出用户的聊天并按时间排序
         const userChats = chatsResponse.data
           .filter(chat => userChatIds.includes(chat.id))
           .sort((a, b) => {
@@ -262,19 +313,19 @@ export default function HistoryPage() {
           });
 
         setAllChats(userChats);
+        await loadMoreChats(userChats, 1);
         
-        // 4. 只获取第一页，但不等待完成就设置initialLoading为false
-        loadMoreChats(userChats, 1);
-        setInitialLoading(false);
       } catch (error) {
         console.error('Error fetching history:', error);
+      } finally {
         setInitialLoading(false);
       }
     }
 
     fetchHistory();
-  }, [user]);
+  }, [user, checkPageCache]);
 
+  // 修改 loadMoreChats 函数以更新页面缓存
   const loadMoreChats = async (chats = allChats, currentPage = page) => {
     if (isLoadingMore) return;
     
@@ -357,6 +408,14 @@ export default function HistoryPage() {
 
       await Promise.all(formattingPromises);
       setHasMore(endIndex < chats.length);
+
+      // 在加载完成后更新页面缓存
+      updatePageCache({
+        allChats: chats,
+        readyChats,
+        page: currentPage
+      });
+
     } catch (error) {
       console.error('Error loading more chats:', error);
     } finally {
@@ -386,6 +445,13 @@ export default function HistoryPage() {
   // 在组件加载时清理过期缓存
   useEffect(() => {
     clearExpiredCache();
+  }, [clearExpiredCache]);
+
+  // 在组件卸载时清理过期缓存
+  useEffect(() => {
+    return () => {
+      clearExpiredCache();
+    };
   }, [clearExpiredCache]);
 
   const toggleChat = (chatId: string) => {
