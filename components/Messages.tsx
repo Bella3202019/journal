@@ -387,10 +387,10 @@ const Messages = forwardRef<
         className="fixed pointer-events-none"
         style={{
           left: '50%',
-          top: isMobile ? '20%' : '30%',  // 调整移动端位置
+          top: isMobile ? '20%' : '30%',
           transform: 'translateX(-50%) translateY(-50%) rotate(90deg)',
-          width: isMobile ? '200px' : '15vw',  // 减小移动端尺寸
-          height: isMobile ? '200px' : '15vw',  // 减小移动端尺寸
+          width: isMobile ? '200px' : '15vw',
+          height: isMobile ? '200px' : '15vw',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -413,18 +413,17 @@ const Messages = forwardRef<
                   cx="87" 
                   cy="87" 
                   r="70" 
-                  className="dark:opacity-100 opacity-60"
+                  className="dark:opacity-100 opacity-80"
                   fill="url(#agentGradient)"
                 />
               </g>
-              {/* 移除了锥形渐变的圆形，只保留发光效果 */}
               <g filter="url(#agentGlow)">
                 <circle 
                   cx="87" 
                   cy="87" 
                   r="78" 
                   style={{
-                    opacity: isPlaying ? 0.8 : 0.4,
+                    opacity: isPlaying ? 0.9 : 0.5,
                     transition: 'opacity 0.3s ease',
                     mixBlendMode: 'soft-light'
                   }}
@@ -443,7 +442,7 @@ const Messages = forwardRef<
               >
                 <feFlood floodOpacity="0" result="BackgroundImageFix" />
                 <feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape" />
-                <feGaussianBlur stdDeviation="18" result="effect1_foregroundBlur" />
+                <feGaussianBlur stdDeviation="12" result="effect1_foregroundBlur" />
               </filter>
               <filter
                 id="agentGlow"
@@ -456,7 +455,7 @@ const Messages = forwardRef<
               >
                 <feFlood floodOpacity="0" result="BackgroundImageFix" />
                 <feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape" />
-                <feGaussianBlur stdDeviation="8" result="effect1_foregroundBlur" />
+                <feGaussianBlur stdDeviation="6" result="effect1_foregroundBlur" />
               </filter>
               <radialGradient
                 id="agentGradient"
@@ -466,8 +465,8 @@ const Messages = forwardRef<
                 gradientUnits="userSpaceOnUse"
                 gradientTransform="translate(87 87) rotate(90) scale(87)"
               >
-                <stop offset="0%" stopColor={agentEmotionColors[0]} stopOpacity="0.9" />
-                <stop offset="50%" stopColor={agentEmotionColors[1] || agentEmotionColors[0]} stopOpacity="0.6" />
+                <stop offset="0%" stopColor={agentEmotionColors[0]} stopOpacity="1" />
+                <stop offset="40%" stopColor={agentEmotionColors[1] || agentEmotionColors[0]} stopOpacity="0.8" />
                 <stop offset="100%" stopColor={agentEmotionColors[2] || agentEmotionColors[0]} stopOpacity="0" />
               </radialGradient>
               <clipPath id="agentClip">
@@ -477,34 +476,35 @@ const Messages = forwardRef<
           </svg>
         </motion.div>
 
-        {/* 外部水波纹 */}
+        {/* 移除外部水波纹的锥形渐变，改为环形渐变 */}
         <>
           {[1, 2, 3].map((index) => (
             <motion.div
               key={index}
-              initial={{ scale: 0.7, opacity: 0.8 }}  // 起始比例设为 0.4
+              initial={{ 
+                scale: 0.85,  // 起始比例调大一些
+                opacity: 0    // 从完全透明开始
+              }}
               animate={{ 
-                scale: [0.75, 1],    // 从 40% 开始扩散到 100%
-                opacity: [0.8, 0],
+                scale: [0.85, 1],    // 保持起始比例一致
+                opacity: [0, 0.8, 0] // 添加中间态，使过渡更柔和
               }}
               transition={{
                 duration: isMobile ? 8 : 12,
                 repeat: Infinity,
                 delay: index * (isMobile ? 3 : 4),
-                ease: "easeOut"
+                ease: "easeInOut",   // 改用 easeInOut 使过渡更平滑
+                times: [0, 0.5, 1]   // 对应 opacity 的三个状态的时间点
               }}
               style={{
                 position: 'absolute',
-                width: '100%',    // 改为100%以填充父容器
-                height: '100%',   // 改为100%以填充父容器
-                background: `conic-gradient(
-                  from 0deg at 50% 50%, 
-                  transparent 0deg,
-                  ${agentEmotionColors[0]} 90deg,
-                  ${agentEmotionColors[1] || agentEmotionColors[0]} 135deg,
-                  ${agentEmotionColors[2] || agentEmotionColors[1] || agentEmotionColors[0]} 160deg,
-                  transparent 180deg,
-                  transparent 360deg
+                width: '100%',
+                height: '100%',
+                background: `radial-gradient(circle at 50% 50%,
+                  ${agentEmotionColors[0]} 0%,
+                  ${agentEmotionColors[1] || agentEmotionColors[0]} 50%,
+                  ${agentEmotionColors[2] || agentEmotionColors[0]} 75%,
+                  transparent 100%
                 )`,
                 borderRadius: '50%',
                 opacity: isPlaying ? 0.9 : 0.5,
@@ -516,65 +516,7 @@ const Messages = forwardRef<
                   0 0 ${isMobile ? '50px 25px' : '70px 35px'} rgba(255, 255, 255, 0.15)
                 `,
               }}
-            >
-              <path
-                d={`
-                  M 100, 100
-                  m -75, 0
-                  ${Array.from({ length: 40 }, (_, i) => {  // 增加点数以获得更细腻的波浪
-                    const angle = (i * Math.PI * 2) / 40;
-                    // 创建多层次的波浪效果
-                    const baseRadius = 75;
-                    const wave1 = Math.sin(angle * 8 + Date.now() / 1000) * 9;
-                    const wave2 = Math.sin(angle * 12 + Date.now() / 800) * 6;
-                    const wave3 = Math.sin(angle * 6 + Date.now() / 1200) * 4;
-                    const variance = wave1 + wave2 + wave3;
-                    
-                    const x = Math.cos(angle) * (baseRadius + variance);
-                    const y = Math.sin(angle) * (baseRadius + variance);
-                    return `${i === 0 ? 'M' : 'L'} ${100 + x},${100 + y}`;
-                  }).join(' ')}
-                  Z
-                `}
-                fill={`conic-gradient(
-                  from 0deg at 50% 50%, 
-                  transparent 0deg,
-                  ${agentEmotionColors[0]} 90deg,
-                  ${agentEmotionColors[1]} 135deg,
-                  ${agentEmotionColors[2]} 160deg,
-                  transparent 180deg,
-                  transparent 360deg
-                )`}
-                style={{
-                  filter: 'blur(0px)',
-                  opacity: isPlaying ? 0.9 : 0.5,
-                }}
-              >
-                <animate
-                  attributeName="d"
-                  dur="2s"
-                  repeatCount="indefinite"
-                  values={`
-                    M 100, 100
-                    m -75, 0
-                    ${Array.from({ length: 40 }, (_, i) => {
-                      const angle = (i * Math.PI * 2) / 40;
-                      // 创建动画的第二帧波浪效果
-                      const baseRadius = 75;
-                      const wave1 = Math.cos(angle * 8) * 6;
-                      const wave2 = Math.cos(angle * 12) * 4;
-                      const wave3 = Math.cos(angle * 6) * 3;
-                      const variance = wave1 + wave2 + wave3;
-                      
-                      const x = Math.cos(angle) * (baseRadius + variance);
-                      const y = Math.sin(angle) * (baseRadius + variance);
-                      return `${i === 0 ? 'M' : 'L'} ${100 + x},${100 + y}`;
-                    }).join(' ')}
-                    Z
-                  `}
-                />
-              </path>
-            </motion.div>
+            />
           ))}
         </>
       </motion.div>
@@ -590,7 +532,7 @@ const Messages = forwardRef<
           style={{
             position: 'absolute',
             left: '50%',
-            bottom: '88vh', // 调整到 agent 圆的位置
+            bottom: '90vh',  // 从 88vh 改为 90vh，使其更靠上
             transform: 'translateX(-50%)',
             fontSize: isMobile ? '0.9rem' : '1rem',
             fontWeight: 500,
