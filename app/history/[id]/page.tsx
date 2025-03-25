@@ -9,12 +9,18 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { HumeService } from '@/lib/hume';
 import { ReturnChatEvent } from "hume/api/resources/empathicVoice";
+import { motion } from 'framer-motion';
+import { cn } from '@/lib/utils';
 
 interface ChatMessage {
   role: string;
   messageText: string;
   timestamp: string;
 }
+
+// 添加渐变色常量
+const userMessageGradient = "bg-gradient-to-r from-emerald-500 to-teal-500";
+const assistantMessageGradient = "bg-gradient-to-r from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800";
 
 export default function ChatHistoryDetail() {
   const params = useParams();
@@ -72,13 +78,13 @@ export default function ChatHistoryDetail() {
   if (!user) return null;
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 overflow-y-auto">
+    <div className="min-h-screen bg-gray-50 dark:bg-zinc-900 overflow-y-auto">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
-        <div className="sticky top-0 z-10 bg-gray-50 dark:bg-gray-900 pb-4">
+        <div className="sticky top-0 z-10 bg-gray-50 dark:bg-zinc-900 pb-4">
           <Button
             variant="ghost"
             onClick={() => router.push('/history')}
-            className="mb-4 -ml-2"
+            className="mb-4 -ml-2 hover:bg-gray-200/70 dark:hover:bg-zinc-800/70"
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
             <span className="text-sm sm:text-base">Back to History</span>
@@ -86,37 +92,77 @@ export default function ChatHistoryDetail() {
         </div>
 
         {pageLoading ? (
-          <div className="text-center py-6 sm:py-10">Loading...</div>
+          <div className="text-center py-6 sm:py-10">
+            <div className="animate-pulse space-y-4">
+              {[1, 2, 3].map((i) => (
+                <div 
+                  key={i}
+                  className="h-24 bg-gray-100 dark:bg-gray-800 rounded-lg max-w-[80%] mx-auto"
+                />
+              ))}
+            </div>
+          </div>
         ) : error ? (
           <div className="text-center py-6 sm:py-10 text-red-500">{error}</div>
         ) : (
-          <div className="space-y-4 bg-white dark:bg-gray-800 rounded-lg shadow overflow-y-auto">
-            <div className="p-3 sm:p-6 space-y-3 sm:space-y-4">
+          <div className="space-y-4 rounded-lg overflow-hidden">
+            <div className="p-3 sm:p-6 space-y-4 sm:space-y-6">
               {messages.map((message, index) => (
-                <div
+                <motion.div
                   key={index}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3, delay: index * 0.1 }}
                   className={`flex flex-col ${
                     message.role !== 'Echo' ? 'items-end' : 'items-start'
                   }`}
                 >
                   <div
-                    className={`max-w-[88%] sm:max-w-[80%] rounded-lg p-3 sm:p-4 ${
+                    className={cn(
+                      "max-w-[88%] sm:max-w-[80%]",
+                      "rounded-2xl",
+                      "p-4 sm:p-5",
+                      "shadow-sm",
                       message.role !== 'Echo'
-                        ? 'bg-blue-500 text-white'
-                        : 'bg-gray-100 dark:bg-gray-700'
-                    }`}
+                        ? [
+                            userMessageGradient,
+                            "text-white",
+                            "shadow-emerald-500/10"
+                          ]
+                        : [
+                            assistantMessageGradient,
+                            "dark:text-gray-100",
+                            "shadow-gray-200/20 dark:shadow-gray-900/30"
+                          ]
+                    )}
                   >
-                    <div className="text-xs sm:text-sm font-medium mb-1">
+                    <div className={cn(
+                      "text-xs sm:text-sm font-medium mb-1.5",
+                      message.role !== 'Echo'
+                        ? "text-emerald-50"
+                        : "text-gray-600 dark:text-gray-300"
+                    )}>
                       {message.role}
                     </div>
-                    <div className="text-sm sm:text-base break-words">
+                    <div className={cn(
+                      "text-sm sm:text-base break-words",
+                      "leading-relaxed",
+                      message.role !== 'Echo'
+                        ? "text-white/95"
+                        : "text-gray-700 dark:text-gray-200"
+                    )}>
                       {message.messageText}
                     </div>
-                    <div className="text-[10px] sm:text-xs opacity-70 mt-1 sm:mt-2">
+                    <div className={cn(
+                      "text-[10px] sm:text-xs mt-2",
+                      message.role !== 'Echo'
+                        ? "text-emerald-50/70"
+                        : "text-gray-500 dark:text-gray-400"
+                    )}>
                       {message.timestamp}
                     </div>
                   </div>
-                </div>
+                </motion.div>
               ))}
             </div>
           </div>

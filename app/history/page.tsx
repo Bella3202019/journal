@@ -389,7 +389,7 @@ export default function HistoryPage() {
   }, [clearExpiredCache]);
 
   const toggleChat = (chatId: string) => {
-    setExpandedChatId(expandedChatId === chatId ? null : chatId);
+    router.push(`/history/${chatId}`);
   };
 
   return (
@@ -535,44 +535,6 @@ export default function HistoryPage() {
                             {chat.summary}
                           </p>
                         </div>
-                        
-                        {expandedChatId === chat.chatId && (
-                          <motion.div 
-                            initial={{ opacity: 0, height: 0 }}
-                            animate={{ opacity: 1, height: "auto" }}
-                            transition={{ duration: 0.3 }}
-                            className="mt-4 bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden"
-                          >
-                            <div className="p-4 space-y-3">
-                              {chat.messages.map((message, msgIndex) => (
-                                <div
-                                  key={msgIndex}
-                                  className={`flex flex-col ${
-                                    message.role === 'User' ? 'items-end' : 'items-start'
-                                  }`}
-                                >
-                                  <div
-                                    className={`max-w-[85%] rounded-lg p-3 ${
-                                      message.role === 'User'
-                                        ? 'bg-blue-500 text-white'
-                                        : 'bg-gray-100 dark:bg-gray-700'
-                                    }`}
-                                  >
-                                    <div className="text-xs font-medium mb-1">
-                                      {message.role}
-                                    </div>
-                                    <div className="text-sm break-words">
-                                      {message.messageText}
-                                    </div>
-                                    <div className="text-[10px] opacity-70 mt-1">
-                                      {message.timestamp}
-                                    </div>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </motion.div>
-                        )}
                       </motion.div>
                     ) : (
                       <motion.div
