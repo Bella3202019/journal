@@ -125,6 +125,8 @@ const Messages = forwardRef<
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const [isExpanded, setIsExpanded] = useState(false);
+  const [smoothVolume, setSmoothVolume] = useState(0);
+  const lastVolumeRef = useRef(0);
   
   
   useEffect(() => {
@@ -251,14 +253,26 @@ const Messages = forwardRef<
     setAgentBackgroundSize(getCircleSize());
   }, []);
 
-  // 计算用户音量并更新圆的大小
+  // 修改计算用户音量的效果
   useEffect(() => {
     if (micFft) {
-      const volume = micFft.reduce((a, b) => a + b, 0);
+      const currentVolume = micFft.reduce((a, b) => a + b, 0);
       const baseSize = getCircleSize();
-      const scale = Math.min(2, 1 + (volume * 2)); // 限制最大缩放为2倍
+      
+      // 使用缓动函数平滑过渡
+      const smoothingFactor = 0.15; // 减小这个值会让过渡更慢
+      const targetVolume = Math.min(1, (currentVolume * 2) / 100);
+      const newVolume = lastVolumeRef.current + (targetVolume - lastVolumeRef.current) * smoothingFactor;
+      
+      lastVolumeRef.current = newVolume;
+      setSmoothVolume(newVolume);
+      
+      // 使用平滑后的音量来设置大小
+      const scale = 1 + newVolume;
       setUserBackgroundSize(baseSize * scale);
     } else {
+      lastVolumeRef.current = 0;
+      setSmoothVolume(0);
       setUserBackgroundSize(getCircleSize());
     }
   }, [micFft]);
@@ -338,6 +352,42 @@ const Messages = forwardRef<
       }, 100);
     }
   }, [messages.length, scrollToCenter]);
+
+  // 修改用户圆形的路径生成代码
+  const generateWavePath = (time: number) => {
+    return Array.from({ length: 540 }, (_, i) => {
+      const angle = (i * Math.PI * 2) / 540;
+      const baseRadius = 800;
+      
+      // 使用平滑后的音量
+      const volume = smoothVolume;
+      
+      // 主要波浪 - 更平缓的波动
+      const mainWave = 
+        Math.sin(angle * 0.8 + time / 6000) * 12 * (volume * 1.2 + 0.5) + // 降低频率
+        Math.sin(angle * 0.4 + time / 8000) * 8 * (volume * 1.0 + 0.3);  // 更慢的波动
+      
+      // 添加更平滑的起伏
+      const smoothWave = 
+        Math.sin(angle * 0.2 + time / 10000) * 5 * (volume * 0.8 + 0.2);  // 更缓慢的波动
+      
+      // 音量驱动的上扬效果 - 更平滑的过渡
+      const volumeEffect = volume > 0.1 ? 
+        Math.pow(Math.max(0, Math.sin(angle - Math.PI/2)), 3) * // 使用三次方使过渡更平滑
+        20 * Math.pow(volume, 1.5) : 0;
+      
+      // 组合所有效果
+      const variance = 
+        mainWave + 
+        smoothWave +
+        volumeEffect +
+        Math.sin(angle * 0.3 + time / 12000) * 4; // 更缓慢的整体起伏
+      
+      const x = Math.cos(angle) * (baseRadius + variance);
+      const y = Math.sin(angle) * (baseRadius + variance);
+      return `${i === 0 ? 'M' : 'L'} ${1000 + x},${1000 + y}`;
+    }).join(' ');
+  };
 
   return (
     <motion.div
@@ -618,39 +668,7 @@ const Messages = forwardRef<
             d={`
               M 1000,1000
               m -800,0
-              ${Array.from({ length: 540 }, (_, i) => {
-                const angle = (i * Math.PI * 2) / 540;
-                const baseRadius = 800;
-                const rawVolume = micFft ? micFft.reduce((a, b) => a + b, 0) / 100 : 0;
-                // 调整音量响应曲线，使其更平滑
-                const volume = Math.min(1, rawVolume * 0.8 + (rawVolume > 0 ? 0.2 : 0));
-                const time = Date.now();
-                
-                // 主要波浪 - 更宽更优雅的波动
-                const mainWave = 
-                  Math.sin(angle * 0.8 + time / 5000) * 12 * (volume * 1.2 + 0.5) + // 基础波形，降低频率，增加振幅
-                  Math.sin(angle * 0.4 + time / 7000) * 8 * (volume * 1.0 + 0.3);  // 次要波形，更慢的波动
-                
-                // 添加平滑的起伏
-                const smoothWave = 
-                  Math.sin(angle * 0.2 + time / 8000) * 5 * (volume * 0.8 + 0.2);  // 非常缓慢的波动
-                
-                // 音量驱动的上扬效果 - 更平滑的过渡
-                const volumeEffect = volume > 0.1 ? 
-                  Math.pow(Math.max(0, Math.sin(angle - Math.PI/2)), 2) * // 使用平方使过渡更平滑
-                  20 * Math.pow(volume, 1.8) : 0; // 增加音量影响
-                
-                // 组合所有效果
-                const variance = 
-                  mainWave + 
-                  smoothWave +
-                  volumeEffect +
-                  Math.sin(angle * 0.3 + time / 10000) * 4; // 更缓慢的整体起伏
-                
-                const x = Math.cos(angle) * (baseRadius + variance);
-                const y = Math.sin(angle) * (baseRadius + variance);
-                return `${i === 0 ? 'M' : 'L'} ${1000 + x},${1000 + y}`;
-              }).join(' ')}
+              ${generateWavePath(Date.now())}
               Z
             `}
             fill="url(#userGradient)"
@@ -658,44 +676,18 @@ const Messages = forwardRef<
             style={{
               filter: 'blur(2px)',
               mixBlendMode: 'soft-light',
-              opacity: 0.7
+              opacity: 0.7,
+              transition: 'all 0.3s ease' // 添加过渡效果
             }}
           >
             <animate
               attributeName="d"
-              dur="8s"  // 增加动画时长使海浪更自然
+              dur="10s"  // 增加动画时长
               repeatCount="indefinite"
               values={`
                 M 1000,1000
                 m -800,0
-                ${Array.from({ length: 540 }, (_, i) => {
-                  const angle = (i * Math.PI * 2) / 540;
-                  const baseRadius = 800;
-                  const rawVolume = micFft ? micFft.reduce((a, b) => a + b, 0) / 100 : 0;
-                  const volume = Math.min(1, rawVolume * 0.8 + (rawVolume > 0 ? 0.2 : 0));
-                  const time = Date.now();
-                  
-                  const mainWave = 
-                    Math.sin(angle * 1 + time / 5000) * 16 * (volume * 1.2 + 0.5) + // 基础波形，降低频率，增加振幅
-                    Math.sin(angle * 0.6 + time / 7000) * 10 * (volume * 1.0 + 0.3);  // 次要波形，更慢的波动
-                  
-                  const smoothWave = 
-                    Math.sin(angle * 0.3 + time / 8000) * 8 * (volume * 0.8 + 0.2);  // 非常缓慢的波动
-                  
-                  const volumeEffect = volume > 0.1 ? 
-                    Math.pow(Math.max(0, Math.sin(angle - Math.PI/2)), 2) * // 使用平方使过渡更平滑
-                    22 * Math.pow(volume, 1.8) : 0; // 增加音量影响
-                  
-                  const variance = 
-                    mainWave + 
-                    smoothWave +
-                    volumeEffect +
-                    Math.sin(angle * 0.3 + time / 10000) * 4; // 更缓慢的整体起伏
-                  
-                  const x = Math.cos(angle) * (baseRadius + variance);
-                  const y = Math.sin(angle) * (baseRadius + variance);
-                  return `${i === 0 ? 'M' : 'L'} ${1000 + x},${1000 + y}`;
-                }).join(' ')}
+                ${generateWavePath(Date.now())}
                 Z
               `}
             />
