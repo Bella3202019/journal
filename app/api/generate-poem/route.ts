@@ -2,6 +2,11 @@ import { HumeService } from '@/lib/hume';
 import { Anthropic } from '@anthropic-ai/sdk';
 import { adminDb } from '@/lib/firebase-admin';
 
+interface PoemData {
+  text: string;
+  chatId: string;
+  createdAt: string;
+}
 
 // what need to be reflected in the poem
 // 1. thoughts or philosophy
@@ -18,6 +23,27 @@ export async function POST(request: Request) {
       throw new Error('Missing conversation content');
     }
 
+    // 1. 首先检查数据库中是否已存在poem
+    try {
+      const existingPoemDoc = await adminDb.collection('poems').doc(chatId).get();
+      if (existingPoemDoc.exists) {
+        console.log(`Found existing poem for chat ${chatId}`);
+        const existingData = existingPoemDoc.data() as PoemData;
+        if (existingData?.text) {
+          return new Response(JSON.stringify({ 
+            poem: existingData.text,
+            source: 'cache'
+          }), {
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+      }
+    } catch (dbError) {
+      console.error('Error checking existing poem:', dbError);
+      // 继续执行，尝试生成新的poem
+    }
+
+    // 2. 如果不存在，则生成新的poem
     const apiKey = process.env.CLAUDE_API_KEY;
     if (!apiKey) {
       throw new Error('CLAUDE_API_KEY is not configured');
@@ -27,7 +53,6 @@ export async function POST(request: Request) {
       apiKey: apiKey
     });
 
-    console.log('Calling Claude API...');
     try {
       const response = await anthropic.messages.create({
         model: "claude-3-opus-20240229",
@@ -52,8 +77,6 @@ Important: Return only ONE clear poetic phrase (4-8 words). No punctuation, no e
         }]
       });
 
-      console.log('Claude API response received:', response);
-
       if (!response.content[0] || response.content[0].type !== 'text') {
         throw new Error('Invalid response format from Claude');
       }
@@ -63,7 +86,17 @@ Important: Return only ONE clear poetic phrase (4-8 words). No punctuation, no e
         .split('\n')[0]
         .replace(/[\r\n]/g, '');
 
-      console.log('Generated poem:', poem);
+      // 3. 保存到数据库
+      try {
+        await adminDb.collection('poems').doc(chatId).set({
+          text: poem,
+          chatId,
+          createdAt: new Date().toISOString()
+        });
+      } catch (saveError) {
+        console.error('Error saving poem:', saveError);
+        // 继续执行，返回生成的poem
+      }
 
       return new Response(JSON.stringify({ 
         poem,
@@ -72,19 +105,37 @@ Important: Return only ONE clear poetic phrase (4-8 words). No punctuation, no e
         headers: { 'Content-Type': 'application/json' },
       });
 
-    } catch (apiError: any) {
+    } catch (apiError) {
       console.error('Claude API error:', apiError);
-      throw new Error(apiError?.message || 'Unknown Claude API error');
+      const fallbackPoem = "Whispers of human connection";
+      
+      // 保存默认poem
+      try {
+        await adminDb.collection('poems').doc(chatId).set({
+          text: fallbackPoem,
+          chatId,
+          createdAt: new Date().toISOString()
+        });
+      } catch (saveError) {
+        console.error('Error saving fallback poem:', saveError);
+      }
+      
+      return new Response(JSON.stringify({ 
+        poem: fallbackPoem,
+        source: 'fallback'
+      }), {
+        headers: { 'Content-Type': 'application/json' },
+      });
     }
 
   } catch (error: any) {
     console.error('Full error details:', error);
     return new Response(JSON.stringify({ 
+      poem: "Moments in conversation",
       error: error?.message || 'Unknown error occurred',
-      source: 'error',
-      details: error?.stack
+      source: 'error'
     }), {
-      status: 400,
+      status: 200, // 改为200，确保客户端总能得到一个poem
       headers: { 'Content-Type': 'application/json' },
     });
   }

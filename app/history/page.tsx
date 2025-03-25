@@ -1,7 +1,7 @@
 "use client";
 
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { HumeService } from '@/lib/hume';
 import { cn } from "@/utils";
 import dynamic from "next/dynamic";
@@ -65,6 +65,14 @@ const gradientPositions = [
   'bg-[length:355%_355%] bg-[position:80%_20%]',
 ];
 
+// 添加缓存相关的常量和类型
+const CACHE_KEY_PREFIX = 'chat_history_';
+const CACHE_EXPIRY_TIME = 1000 * 60 * 30; // 30分钟缓存过期
+
+interface CachedChat extends FormattedChat {
+  timestamp: number;
+}
+
 export default function HistoryPage() {
   const router = useRouter();
   const auth = getAuth(app);
@@ -76,84 +84,168 @@ export default function HistoryPage() {
   // 分页相关状态
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
-  const CHATS_PER_PAGE = 10;
+  const CHATS_PER_PAGE = 9;
   const [allChats, setAllChats] = useState<any[]>([]);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [readyChats, setReadyChats] = useState<FormattedChat[]>([]);
 
-  const formatChatEvents = async (chat: { chatId: string; events: ReturnChatEvent[] }): Promise<FormattedChat> => {
-    const relevantEvents = chat.events.filter(
-      (event) => event.type === "USER_MESSAGE" || event.type === "AGENT_MESSAGE"
-    );
+  // 添加并行加载状态
+  const [loadingStates, setLoadingStates] = useState<Record<string, boolean>>({});
 
-    const messages = relevantEvents.map(event => ({
-      role: event.role === "USER" ? "User" : "Dela",
-      timestamp: new Date(event.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      messageText: event.messageText || ''
-    }));
-
-    const firstEvent = chat.events[0];
-    const lastEvent = chat.events[chat.events.length - 1];
-    const durationMs = lastEvent.timestamp - firstEvent.timestamp;
-    const durationSeconds = Math.floor(durationMs / 1000);
-    
-    // 修改时长显示逻辑
-    const minutes = Math.floor(durationSeconds / 60);
-    const seconds = durationSeconds % 60;
-    const duration = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
-
-    // 如果对话时长不超过15秒，使用固定文字
-    const summary = durationSeconds <= 15 
-      ? "Test is for a better future"
-      : await generateSummary(messages);
-
-    // 修改日期显示格式
-    const startDate = new Date(firstEvent.timestamp);
-    const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-
-    let startTimeStr;
-    if (startDate.toDateString() === today.toDateString()) {
-      startTimeStr = `Today, ${startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-    } else if (startDate.toDateString() === yesterday.toDateString()) {
-      startTimeStr = `Yesterday, ${startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-    } else {
-      // 使用 "Sun, 26 Feb" 格式
-      startTimeStr = startDate.toLocaleDateString('en-US', {
-        weekday: 'short',
-        day: 'numeric',
-        month: 'short'
-      });
+  // 添加缓存相关函数
+  const getCachedChat = useCallback((chatId: string): FormattedChat | null => {
+    try {
+      const cached = localStorage.getItem(`${CACHE_KEY_PREFIX}${chatId}`);
+      if (cached) {
+        const parsedCache: CachedChat = JSON.parse(cached);
+        // 检查缓存是否过期
+        if (Date.now() - parsedCache.timestamp < CACHE_EXPIRY_TIME) {
+          const { timestamp, ...chatData } = parsedCache;
+          return chatData;
+        } else {
+          // 清除过期缓存
+          localStorage.removeItem(`${CACHE_KEY_PREFIX}${chatId}`);
+        }
+      }
+    } catch (error) {
+      console.error('Error reading from cache:', error);
     }
+    return null;
+  }, []);
 
-    return {
-      chatId: chat.chatId,
-      startTime: startTimeStr,
-      duration,
-      summary,
-      messages
-    };
+  const setCachedChat = useCallback((chatId: string, chat: FormattedChat) => {
+    try {
+      const cacheData: CachedChat = {
+        ...chat,
+        timestamp: Date.now()
+      };
+      localStorage.setItem(
+        `${CACHE_KEY_PREFIX}${chatId}`, 
+        JSON.stringify(cacheData)
+      );
+    } catch (error) {
+      console.error('Error writing to cache:', error);
+    }
+  }, []);
+
+  const formatChatEvents = async (chat: { 
+    chatId: string; 
+    events: ReturnChatEvent[]; 
+    existingPoem?: string 
+  }): Promise<FormattedChat> => {
+    // 设置加载状态
+    setLoadingStates(prev => ({ ...prev, [chat.chatId]: true }));
+
+    try {
+      const relevantEvents = chat.events.filter(
+        (event) => event.type === "USER_MESSAGE" || event.type === "AGENT_MESSAGE"
+      );
+
+      // 并行处理消息和时间计算
+      const [messages, timeInfo] = await Promise.all([
+        // 处理消息
+        Promise.all(relevantEvents.map(event => ({
+          role: event.role === "USER" ? "User" : "Dela",
+          timestamp: new Date(event.timestamp).toLocaleTimeString([], { 
+            hour: '2-digit', 
+            minute: '2-digit' 
+          }),
+          messageText: event.messageText || ''
+        }))),
+        // 处理时间信息
+        (async () => {
+          const firstEvent = chat.events[0];
+          const lastEvent = chat.events[chat.events.length - 1];
+          const durationMs = lastEvent.timestamp - firstEvent.timestamp;
+          const durationSeconds = Math.floor(durationMs / 1000);
+          const minutes = Math.floor(durationSeconds / 60);
+          const seconds = durationSeconds % 60;
+          
+          return {
+            durationSeconds,
+            duration: minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`,
+            startDate: new Date(firstEvent.timestamp)
+          };
+        })()
+      ]);
+
+      // 如果有现成的poem或对话太短，直接使用
+      let summary;
+      if (timeInfo.durationSeconds <= 15) {
+        summary = "Test is for a better future";
+      } else if (chat.existingPoem) {
+        summary = chat.existingPoem;
+      } else {
+        const conversation = messages
+          .filter(msg => msg.messageText?.trim())
+          .map(msg => `${msg.role}: ${msg.messageText}`)
+          .join('\n');
+
+        if (conversation) {
+          try {
+            const response = await fetch('/api/generate-poem', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ chatId: chat.chatId, conversation })
+            });
+            const data = await response.json();
+            summary = data.poem || "Conversation insights";
+          } catch (error) {
+            console.error('Error generating summary:', error);
+            summary = "Conversation insights";
+          }
+        } else {
+          summary = "Brief exchange of words";
+        }
+      }
+
+      // 格式化开始时间
+      const today = new Date();
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+
+      let startTimeStr;
+      if (timeInfo.startDate.toDateString() === today.toDateString()) {
+        startTimeStr = `Today, ${timeInfo.startDate.toLocaleTimeString([], { 
+          hour: '2-digit', 
+          minute: '2-digit' 
+        })}`;
+      } else if (timeInfo.startDate.toDateString() === yesterday.toDateString()) {
+        startTimeStr = `Yesterday, ${timeInfo.startDate.toLocaleTimeString([], { 
+          hour: '2-digit', 
+          minute: '2-digit' 
+        })}`;
+      } else {
+        startTimeStr = timeInfo.startDate.toLocaleDateString('en-US', {
+          weekday: 'short',
+          day: 'numeric',
+          month: 'short'
+        });
+      }
+
+      return {
+        chatId: chat.chatId,
+        startTime: startTimeStr,
+        duration: timeInfo.duration,
+        summary,
+        messages
+      };
+    } finally {
+      setLoadingStates(prev => ({ ...prev, [chat.chatId]: false }));
+    }
   };
 
-  // 辅助函数：生成摘要（仅在对话时长超过15秒时调用）
-  const generateSummary = async (messages: any[]) => {
-    const conversation = messages.map(msg => `${msg.role}: ${msg.messageText}`).join('\n');
-    const response = await fetch('/api/generate-poem', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ conversation })
-    });
-    const { poem } = await response.json();
-    return poem;
-  };
+  const [initialLoading, setInitialLoading] = useState(true);
 
   useEffect(() => {
     async function fetchHistory() {
       if (!user) {
-        setIsLoading(false);
+        setInitialLoading(false);
         return;
       }
 
       try {
+        setInitialLoading(true);
         // 1. 获取用户的聊天ID列表
         const userChatIds = await getUserChatIds(user.uid);
         
@@ -164,7 +256,6 @@ export default function HistoryPage() {
         const userChats = chatsResponse.data
           .filter(chat => userChatIds.includes(chat.id))
           .sort((a, b) => {
-            // 添加空值检查，如果没有 endTimestamp 则使用当前时间
             const timeA = a.endTimestamp ? new Date(a.endTimestamp).getTime() : Date.now();
             const timeB = b.endTimestamp ? new Date(b.endTimestamp).getTime() : Date.now();
             return timeB - timeA;
@@ -172,43 +263,130 @@ export default function HistoryPage() {
 
         setAllChats(userChats);
         
-        // 4. 只获取第一页的聊天事件
-        await loadMoreChats(userChats);
+        // 4. 只获取第一页，但不等待完成就设置initialLoading为false
+        loadMoreChats(userChats, 1);
+        setInitialLoading(false);
       } catch (error) {
         console.error('Error fetching history:', error);
-      } finally {
-        setIsLoading(false);
+        setInitialLoading(false);
       }
     }
 
     fetchHistory();
   }, [user]);
 
-  const loadMoreChats = async (chats = allChats) => {
-    const startIndex = (page - 1) * CHATS_PER_PAGE;
-    const endIndex = startIndex + CHATS_PER_PAGE;
-    const currentPageChats = chats.slice(startIndex, endIndex);
-
-    if (currentPageChats.length === 0) {
-      setHasMore(false);
-      return;
-    }
-
-    // 获取当前页的聊天事件
-    const chatsWithEventsPromises = currentPageChats.map(async (chat) => {
-      const events = await HumeService.getChatEvents(chat.id);
-      return {
-        chatId: chat.id,
-        events
-      };
-    });
-
-    const newChatsWithEvents = await Promise.all(chatsWithEventsPromises);
-    const newFormattedChats = await Promise.all(newChatsWithEvents.map(formatChatEvents));
+  const loadMoreChats = async (chats = allChats, currentPage = page) => {
+    if (isLoadingMore) return;
     
-    setFormattedChats(prev => [...prev, ...newFormattedChats]);
-    setHasMore(endIndex < chats.length);
+    try {
+      setIsLoadingMore(true);
+      const startIndex = (currentPage - 1) * CHATS_PER_PAGE;
+      const endIndex = startIndex + CHATS_PER_PAGE;
+      const currentPageChats = chats.slice(startIndex, endIndex);
+      
+      if (currentPageChats.length === 0) {
+        setHasMore(false);
+        return;
+      }
+
+      // 1. 先检查缓存并显示缓存的数据
+      currentPageChats.forEach((chat, idx) => {
+        const cachedChat = getCachedChat(chat.id);
+        if (cachedChat) {
+          setReadyChats(prev => {
+            const newChats = [...prev];
+            const index = startIndex + idx;
+            newChats[index] = cachedChat;
+            return newChats;
+          });
+        }
+      });
+
+      // 2. 过滤出需要加载的聊天
+      const chatsToLoad = currentPageChats.filter(
+        chat => !getCachedChat(chat.id)
+      );
+
+      if (chatsToLoad.length === 0) {
+        setHasMore(endIndex < chats.length);
+        setIsLoadingMore(false);
+        return;
+      }
+
+      const currentChatIds = chatsToLoad.map(chat => chat.id);
+
+      // 3. 并行请求poems和events
+      const [poemsResponse, eventsResponses] = await Promise.all([
+        fetch('/api/get-poems', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ chatIds: currentChatIds })
+        }),
+        Promise.all(chatsToLoad.map(chat => 
+          HumeService.getChatEvents(chat.id)
+        ))
+      ]);
+      
+      let poemsMap = new Map();
+      if (poemsResponse.ok) {
+        const { poems } = await poemsResponse.json();
+        poemsMap = new Map(poems.map((poem: any) => [poem.chatId, poem.text]));
+      }
+
+      // 4. 并行处理未缓存的chats
+      const formattingPromises = chatsToLoad.map(async (chat, idx) => {
+        const formattedChat = await formatChatEvents({
+          chatId: chat.id,
+          events: eventsResponses[idx],
+          existingPoem: poemsMap.get(chat.id)
+        });
+
+        // 5. 缓存格式化后的数据
+        setCachedChat(chat.id, formattedChat);
+
+        // 6. 更新UI
+        setReadyChats(prev => {
+          const newChats = [...prev];
+          const index = startIndex + currentPageChats.indexOf(chat);
+          newChats[index] = formattedChat;
+          return newChats;
+        });
+
+        return formattedChat;
+      });
+
+      await Promise.all(formattingPromises);
+      setHasMore(endIndex < chats.length);
+    } catch (error) {
+      console.error('Error loading more chats:', error);
+    } finally {
+      setIsLoadingMore(false);
+    }
   };
+
+  // 添加缓存清理函数
+  const clearExpiredCache = useCallback(() => {
+    try {
+      Object.keys(localStorage).forEach(key => {
+        if (key.startsWith(CACHE_KEY_PREFIX)) {
+          const cached = localStorage.getItem(key);
+          if (cached) {
+            const parsedCache: CachedChat = JSON.parse(cached);
+            if (Date.now() - parsedCache.timestamp >= CACHE_EXPIRY_TIME) {
+              localStorage.removeItem(key);
+            }
+          }
+        }
+      });
+    } catch (error) {
+      console.error('Error clearing expired cache:', error);
+    }
+  }, []);
+
+  // 在组件加载时清理过期缓存
+  useEffect(() => {
+    clearExpiredCache();
+  }, [clearExpiredCache]);
 
   const toggleChat = (chatId: string) => {
     setExpandedChatId(expandedChatId === chatId ? null : chatId);
@@ -259,83 +437,138 @@ export default function HistoryPage() {
         "md:overflow-hidden overflow-auto",
         "h-[calc(100vh-60px)]"
       )}>
-        {isLoading ? (
-          <div className="text-center py-8">Loading chat history...</div>
+        {initialLoading ? (
+          <div className={cn(
+            "grid gap-8",
+            "grid-cols-1 md:grid-cols-3",
+            "auto-rows-max"
+          )}>
+            {Array.from({ length: CHATS_PER_PAGE }).map((_, index) => (
+              <div 
+                key={`skeleton-${index}`}
+                className="w-full px-1"
+              >
+                <motion.div
+                  className="w-full h-48 rounded-3xl bg-gray-100 dark:bg-gray-800 animate-pulse"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.3, delay: index * 0.1 }}
+                />
+                <div className="mt-3 h-6 bg-gray-100 dark:bg-gray-800 rounded animate-pulse" />
+                <div className="mt-2 h-4 bg-gray-100 dark:bg-gray-800 rounded animate-pulse w-3/4" />
+              </div>
+            ))}
+          </div>
         ) : (
           <>
             <div className={cn(
-              "grid gap-8",  // 增加间距
+              "grid gap-8",
               "grid-cols-1 md:grid-cols-3",
               "auto-rows-max"
             )}>
-              {formattedChats.map((chat, index) => (
-                <div 
-                  key={`chat-${chat.chatId}-${index}`}
-                  className="w-full px-1"  // 简化容器样式
-                  onClick={() => toggleChat(chat.chatId)}
-                >
-                  <motion.div 
-                    className={cn(
-                      "w-full h-48",
-                      "rounded-3xl",
-                      "bg-gradient-to-r",
-                      lightGradients[index % lightGradients.length],
-                      darkGradients[index % darkGradients.length],
-                      gradientPositions[index % gradientPositions.length],
-                      "relative overflow-hidden",
-                      "mb-3"  // 添加底部间距
-                    )}
-                    whileHover={{ 
-                      scale: 1.02,
-                      boxShadow: "0px 3px 8px rgba(0,0,0,0.1)"
-                    }}
-                    transition={{ duration: 0.2 }}
+              {Array.from({ length: Math.min(page * CHATS_PER_PAGE, allChats.length) }).map((_, index) => {
+                const chat = readyChats[index];
+                const isLoading = loadingStates[allChats[index]?.id];
+                
+                return (
+                  <div 
+                    key={chat?.chatId || `placeholder-${index}`}
+                    className="w-full px-1"
                   >
-                    {/* 磨砂效果层保持不变 */}
-                    <div className={cn(
-                      "absolute inset-0",
-                      "bg-gradient-to-br from-white/10 via-transparent to-black/5",
-                      "dark:from-white/5 dark:to-black/10",
-                      "mix-blend-overlay",
-                      "backdrop-filter backdrop-blur-[0.5px]"
-                    )} />
-                    
-                    <div className={cn(
-                      "absolute inset-0",
-                      "bg-noise",
-                      "opacity-[0.15]",
-                      "mix-blend-overlay"
-                    )} />
-                  </motion.div>
-
-                  <div className={cn(
-                    "flex justify-between items-center",
-                    "px-1",
-                    "text-black-700 dark:text-white-500"
-                  )}>
-                    <time className="text-lg font-medium">{chat.startTime}</time>
-                    <span className="text-gray-500 dark:text-gray-400">{chat.duration}</span>
+                    {chat ? (
+                      // 已加载完成的卡片
+                      <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.3 }}
+                      >
+                        <div 
+                          onClick={() => toggleChat(chat.chatId)}
+                          className="cursor-pointer"
+                        >
+                          <motion.div 
+                            className={cn(
+                              "w-full h-48",
+                              "rounded-3xl",
+                              "bg-gradient-to-r",
+                              lightGradients[index % lightGradients.length],
+                              darkGradients[index % darkGradients.length],
+                              gradientPositions[index % gradientPositions.length],
+                              "relative overflow-hidden",
+                              "mb-3"
+                            )}
+                            whileHover={{ 
+                              scale: 1.02,
+                              boxShadow: "0px 3px 8px rgba(0,0,0,0.1)"
+                            }}
+                            transition={{ duration: 0.2 }}
+                          >
+                            {/* 磨砂效果层保持不变 */}
+                            <div className={cn(
+                              "absolute inset-0",
+                              "bg-gradient-to-br from-white/10 via-transparent to-black/5",
+                              "dark:from-white/5 dark:to-black/10",
+                              "mix-blend-overlay",
+                              "backdrop-filter backdrop-blur-[0.5px]"
+                            )} />
+                            
+                            <div className={cn(
+                              "absolute inset-0",
+                              "bg-noise",
+                              "opacity-[0.15]",
+                              "mix-blend-overlay"
+                            )} />
+                          </motion.div>
+                          
+                          <div className={cn(
+                            "flex justify-between items-center",
+                            "px-1"
+                          )}>
+                            <time className="text-lg font-medium">{chat.startTime}</time>
+                            <span className="text-gray-500">{chat.duration}</span>
+                          </div>
+                          
+                          <p className={cn(
+                            "mt-1 px-1",
+                            "line-clamp-2",
+                            "text-left"
+                          )}>
+                            {chat.summary}
+                          </p>
+                        </div>
+                      </motion.div>
+                    ) : (
+                      // 更精细的占位卡片，显示加载状态
+                      <motion.div
+                        className={cn(
+                          "w-full h-48 rounded-3xl",
+                          "relative overflow-hidden",
+                          "bg-gray-100 dark:bg-gray-800",
+                          isLoading ? "animate-pulse" : ""
+                        )}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ duration: 0.3 }}
+                      >
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <div className="text-sm text-gray-400">
+                            {isLoading ? "Loading..." : "Preparing..."}
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
                   </div>
-                  
-                  <p className={cn(
-                    "mt-1 px-1",
-                    "text-black-700 dark:text-white-500",
-                    "line-clamp-2",
-                    "text-left"
-                  )}>
-                    {chat.summary}
-                  </p>
-                </div>
-              ))}
+                );
+              })}
             </div>
             
-            {hasMore && (
+            {hasMore && !isLoadingMore && (
               <div className="text-center pb-4 md:sticky md:bottom-0 md:bg-gray-50/80 md:dark:bg-zinc-900/80 md:backdrop-blur-sm">
                 <Button
                   variant="outline"
                   onClick={() => {
                     setPage(prev => prev + 1);
-                    loadMoreChats();
+                    loadMoreChats(allChats, page + 1);
                   }}
                 >
                   Load More
