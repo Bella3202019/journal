@@ -104,6 +104,9 @@ export default function HistoryPage() {
   // 添加并行加载状态
   const [loadingStates, setLoadingStates] = useState<Record<string, boolean>>({});
 
+  // 添加重新生成状态
+  const [regeneratingPoems, setRegeneratingPoems] = useState<Record<string, boolean>>({});
+
   // 添加缓存相关函数
   const getCachedChat = useCallback((chatId: string): FormattedChat | null => {
     try {
@@ -176,7 +179,8 @@ export default function HistoryPage() {
   const formatChatEvents = async (chat: { 
     chatId: string; 
     events: ReturnChatEvent[]; 
-    existingPoem?: string 
+    existingPoem?: string;
+    forceRefresh?: boolean
   }): Promise<FormattedChat> => {
     // 设置加载状态
     setLoadingStates(prev => ({ ...prev, [chat.chatId]: true }));
@@ -214,11 +218,11 @@ export default function HistoryPage() {
         })()
       ]);
 
-      // 如果有现成的poem或对话太短，直接使用
+      // 如果有现成的poem或对话太短，直接使用，除非强制刷新
       let summary;
       if (timeInfo.durationSeconds <= 15) {
         summary = "Test is for a better future";
-      } else if (chat.existingPoem) {
+      } else if (chat.existingPoem && !chat.forceRefresh) {
         summary = chat.existingPoem;
       } else {
         const conversation = messages
@@ -228,13 +232,28 @@ export default function HistoryPage() {
 
         if (conversation) {
           try {
+            // 如果是强制刷新，添加一个额外的参数
             const response = await fetch('/api/generate-poem', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ chatId: chat.chatId, conversation })
+              body: JSON.stringify({ 
+                chatId: chat.chatId, 
+                conversation,
+                forceUnique: chat.forceRefresh
+              })
             });
             const data = await response.json();
-            summary = data.poem || "Conversation insights";
+            
+            // 检查是否返回的是默认摘要
+            if (data.poem && data.poem !== "Whispers of human connection" && data.poem !== "Conversation insights") {
+              summary = data.poem;
+            } else if (chat.forceRefresh) {
+              // 如果是强制刷新但仍然得到默认摘要，使用对话长度作为特征生成一个更具体的摘要
+              const words = conversation.split(/\s+/).length;
+              summary = `A ${words} word dialogue on ${new Date().toLocaleDateString()}`;
+            } else {
+              summary = data.poem || "Conversation insights";
+            }
           } catch (error) {
             console.error('Error generating summary:', error);
             summary = "Conversation insights";
@@ -396,7 +415,8 @@ export default function HistoryPage() {
         const formattedChat = await formatChatEvents({
           chatId: chat.id,
           events: eventsResponses[idx],
-          existingPoem: poemsMap.get(chat.id)
+          existingPoem: poemsMap.get(chat.id),
+          forceRefresh: false
         });
 
         // 5. 缓存格式化后的数据
@@ -464,6 +484,96 @@ export default function HistoryPage() {
 
   const toggleChat = (chatId: string) => {
     router.push(`/history/${chatId}`);
+  };
+
+  // 重新生成poem的函数
+  const regeneratePoem = async (chatId: string, index: number) => {
+    if (regeneratingPoems[chatId]) return; // 防止重复点击
+    
+    console.log(`开始重新生成摘要, chatId: ${chatId}, index: ${index}`);
+    
+    try {
+      // 设置正在重新生成状态
+      setRegeneratingPoems(prev => ({ ...prev, [chatId]: true }));
+      
+      // 获取聊天事件
+      console.log(`正在获取聊天事件, chatId: ${chatId}`);
+      const events = await HumeService.getChatEvents(chatId);
+      console.log(`成功获取聊天事件, 事件数量: ${events.length}`);
+      
+      // 提取对话内容
+      const relevantEvents = events.filter(
+        event => event.type === "USER_MESSAGE" || event.type === "AGENT_MESSAGE"
+      );
+      console.log(`筛选出相关消息事件: ${relevantEvents.length}/${events.length}`);
+      
+      const conversation = relevantEvents
+        .map(event => `${event.role === "USER" ? "User" : "Dela"}: ${event.messageText || ''}`)
+        .join('\n');
+      
+      console.log(`对话内容长度: ${conversation.length} 字符`);
+      
+      // 调用API强制重新生成
+      console.log(`正在调用 /api/generate-poem API 重新生成摘要`);
+      const response = await fetch('/api/generate-poem', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          chatId, 
+          conversation,
+          forceRegenerate: true
+        })
+      });
+      
+      if (!response.ok) {
+        console.error(`API 调用失败, 状态码: ${response.status}`);
+        throw new Error(`API failed with status ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log(`API 返回数据:`, data);
+      
+      if (data.poem) {
+        console.log(`成功获取新摘要: "${data.poem}"`);
+        
+        // 更新UI
+        setReadyChats(prev => {
+          const newChats = [...prev];
+          if (newChats[index]) {
+            console.log(`更新 UI, 从 "${newChats[index].summary}" 到 "${data.poem}"`);
+            newChats[index] = {
+              ...newChats[index],
+              summary: data.poem
+            };
+          } else {
+            console.warn(`无法更新 UI, 索引 ${index} 不存在于 readyChats 中`);
+          }
+          return newChats;
+        });
+        
+        // 更新缓存
+        const chat = readyChats[index];
+        if (chat) {
+          console.log(`更新本地缓存 ${CACHE_KEY_PREFIX}${chatId}`);
+          setCachedChat(chatId, {
+            ...chat,
+            summary: data.poem
+          });
+        }
+        
+        // 更新页面缓存
+        console.log(`更新页面缓存 ${PAGE_CACHE_KEY}`);
+        updatePageCache();
+      } else {
+        console.error(`API 返回数据中没有 poem 字段:`, data);
+      }
+    } catch (error) {
+      console.error(`重新生成摘要出错:`, error);
+    } finally {
+      // 重置状态
+      console.log(`重置重新生成状态 chatId: ${chatId}`);
+      setRegeneratingPoems(prev => ({ ...prev, [chatId]: false }));
+    }
   };
 
   return (
@@ -555,59 +665,98 @@ export default function HistoryPage() {
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.3 }}
                       >
-                        <div 
-                          onClick={() => toggleChat(chat.chatId)}
-                          className="cursor-pointer"
-                        >
-                          <motion.div 
-                            className={cn(
-                              "w-full h-48",
-                              "rounded-3xl",
-                              "bg-gradient-to-r",
-                              lightGradients[index % lightGradients.length],
-                              darkGradients[index % darkGradients.length],
-                              gradientPositions[index % gradientPositions.length],
-                              "relative overflow-hidden",
-                              "mb-3"
-                            )}
-                            whileHover={{ 
-                              scale: 1.02,
-                              boxShadow: "0px 3px 8px rgba(0,0,0,0.1)"
-                            }}
-                            transition={{ duration: 0.2 }}
+                        <div className="relative group">
+                          <div 
+                            onClick={() => toggleChat(chat.chatId)}
+                            className="w-full cursor-pointer"
                           >
-                            {/* 磨砂效果层保持不变 */}
-                            <div className={cn(
-                              "absolute inset-0",
-                              "bg-gradient-to-br from-white/10 via-transparent to-black/5",
-                              "dark:from-white/5 dark:to-black/10",
-                              "mix-blend-overlay",
-                              "backdrop-filter backdrop-blur-[0.5px]"
-                            )} />
+                            <motion.div 
+                              className={cn(
+                                "w-full h-48",
+                                "rounded-3xl",
+                                "bg-gradient-to-r",
+                                lightGradients[index % lightGradients.length],
+                                darkGradients[index % darkGradients.length],
+                                gradientPositions[index % gradientPositions.length],
+                                "relative overflow-hidden",
+                                "mb-3"
+                              )}
+                              whileHover={{ 
+                                scale: 1.02,
+                                boxShadow: "0px 3px 8px rgba(0,0,0,0.1)"
+                              }}
+                              transition={{ duration: 0.2 }}
+                            >
+                              {/* 磨砂效果层保持不变 */}
+                              <div className={cn(
+                                "absolute inset-0",
+                                "bg-gradient-to-br from-white/10 via-transparent to-black/5",
+                                "dark:from-white/5 dark:to-black/10",
+                                "mix-blend-overlay",
+                                "backdrop-filter backdrop-blur-[0.5px]"
+                              )} />
+                              
+                              <div className={cn(
+                                "absolute inset-0",
+                                "bg-noise",
+                                "opacity-[0.15]",
+                                "mix-blend-overlay"
+                              )} />
+                            </motion.div>
                             
                             <div className={cn(
-                              "absolute inset-0",
-                              "bg-noise",
-                              "opacity-[0.15]",
-                              "mix-blend-overlay"
-                            )} />
-                          </motion.div>
-                          
-                          <div className={cn(
-                            "flex justify-between items-center",
-                            "px-1"
-                          )}>
-                            <time className="text-lg font-medium">{chat.startTime}</time>
-                            <span className="text-gray-500">{chat.duration}</span>
+                              "flex justify-between items-center",
+                              "px-1"
+                            )}>
+                              <time className="text-lg font-medium">{chat.startTime}</time>
+                              <span className="text-gray-500">{chat.duration}</span>
+                            </div>
+                            
+                            <div className="flex justify-between items-start mt-1 px-1">
+                              <p className={cn(
+                                "line-clamp-2",
+                                "text-left",
+                                "pr-7", // 为按钮留出空间
+                                "flex-1"
+                              )}>
+                                {chat.summary}
+                              </p>
+                              
+                              {/* 重新生成按钮 - 放在摘要旁边 */}
+                              <button
+                                className={cn(
+                                  "flex-shrink-0 ml-1 p-1.5 rounded-full",
+                                  "bg-transparent hover:bg-gray-100/80 dark:hover:bg-gray-800/80",
+                                  "transition-colors duration-200",
+                                  "text-gray-500 hover:text-gray-700 dark:hover:text-gray-300",
+                                  "focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-300 dark:focus:ring-gray-700",
+                                  "group-hover:opacity-100",
+                                  regeneratingPoems[chat.chatId] ? "opacity-100" : "opacity-0"
+                                )}
+                                onClick={(e) => {
+                                  e.stopPropagation(); // 防止触发卡片点击
+                                  regeneratePoem(chat.chatId, index);
+                                }}
+                                disabled={regeneratingPoems[chat.chatId]}
+                                title="Regenerate summary"
+                                aria-label="Regenerate summary"
+                              >
+                                {regeneratingPoems[chat.chatId] ? (
+                                  <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                  </svg>
+                                ) : (
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-refresh-cw">
+                                    <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path>
+                                    <path d="M21 3v5h-5"></path>
+                                    <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"></path>
+                                    <path d="M8 16H3v5"></path>
+                                  </svg>
+                                )}
+                              </button>
+                            </div>
                           </div>
-                          
-                          <p className={cn(
-                            "mt-1 px-1",
-                            "line-clamp-2",
-                            "text-left"
-                          )}>
-                            {chat.summary}
-                          </p>
                         </div>
                       </motion.div>
                     ) : (
