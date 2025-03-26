@@ -82,6 +82,7 @@ interface PageCache {
   allChats: any[];
   readyChats: FormattedChat[];
   page: number;
+  loadingStates: Record<string, boolean>;
 }
 
 export default function HistoryPage() {
@@ -157,17 +158,20 @@ export default function HistoryPage() {
   }, []);
 
   // 更新页面缓存
-  const updatePageCache = useCallback((data: Omit<PageCache, 'timestamp'>) => {
+  const updatePageCache = useCallback(() => {
     try {
       const cacheData = {
-        ...data,
+        allChats,
+        readyChats,
+        page,
+        loadingStates,
         timestamp: Date.now()
       };
       localStorage.setItem(PAGE_CACHE_KEY, JSON.stringify(cacheData));
     } catch (error) {
       console.error('Error updating page cache:', error);
     }
-  }, []);
+  }, [allChats, readyChats, page, loadingStates]);
 
   const formatChatEvents = async (chat: { 
     chatId: string; 
@@ -295,6 +299,8 @@ export default function HistoryPage() {
           setAllChats(pageCache.allChats);
           setReadyChats(pageCache.readyChats);
           setPage(pageCache.page);
+          // 恢复加载状态
+          setLoadingStates(pageCache.loadingStates || {});
           setInitialLoading(false);
           setHasMore(pageCache.allChats.length > pageCache.readyChats.length);
           return;
@@ -325,7 +331,8 @@ export default function HistoryPage() {
     fetchHistory();
   }, [user, checkPageCache]);
 
-  // 修改 loadMoreChats 函数以更新页面缓存
+  // 修改 loadMoreChats 函数，不在这里更新缓存
+  // 因为我们已经通过 useEffect 实现了自动缓存更新
   const loadMoreChats = async (chats = allChats, currentPage = page) => {
     if (isLoadingMore) return;
     
@@ -409,13 +416,6 @@ export default function HistoryPage() {
       await Promise.all(formattingPromises);
       setHasMore(endIndex < chats.length);
 
-      // 在加载完成后更新页面缓存
-      updatePageCache({
-        allChats: chats,
-        readyChats,
-        page: currentPage
-      });
-
     } catch (error) {
       console.error('Error loading more chats:', error);
     } finally {
@@ -453,6 +453,14 @@ export default function HistoryPage() {
       clearExpiredCache();
     };
   }, [clearExpiredCache]);
+
+  // 添加一个 useEffect 来在状态更新时触发缓存更新
+  useEffect(() => {
+    // 只有当有数据且不在初始加载状态时才更新缓存
+    if (allChats.length > 0 && !initialLoading) {
+      updatePageCache();
+    }
+  }, [allChats, readyChats, page, loadingStates, initialLoading, updatePageCache]);
 
   const toggleChat = (chatId: string) => {
     router.push(`/history/${chatId}`);
