@@ -60,7 +60,7 @@ export default function AuthButton() {
       
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Sign in</DialogTitle>
+          <DialogTitle className="text-white dark:text-gray-200">Sign in</DialogTitle>
         </DialogHeader>
         
         <div className="py-4">

@@ -205,11 +205,8 @@ export default function Auth({ onSuccess }: AuthProps) {
       </Button>
 
       <div className="relative my-4">
-        <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-gray-300"></div>
-        </div>
         <div className="relative flex justify-center text-sm">
-          <span className="px-2 bg-white text-gray-500">Or continue with email</span>
+          <span className="text-white dark:text-gray-200 font-medium">Or continue with email</span>
         </div>
       </div>
 
@@ -219,7 +216,7 @@ export default function Auth({ onSuccess }: AuthProps) {
           value={username}
           onChange={(e) => setUsername(e.target.value)}
           placeholder="Username"
-          className="border-2"
+          className="border-2 border-gray-300 text-white placeholder:text-white/80 focus:border-white focus:ring-1 focus:ring-white dark:border-gray-700 dark:text-gray-200 dark:placeholder:text-gray-500 dark:focus:border-gray-500"
         />
       )}
       <Input
@@ -227,18 +224,18 @@ export default function Auth({ onSuccess }: AuthProps) {
         value={email}
         onChange={(e) => setEmail(e.target.value)}
         placeholder="Email"
-        className="border-2"
+        className="border-2 border-gray-300 text-white placeholder:text-white/80 focus:border-white focus:ring-1 focus:ring-white dark:border-gray-700 dark:text-gray-200 dark:placeholder:text-gray-500 dark:focus:border-gray-500"
       />
       <Input
         type="password"
         value={password}
         onChange={(e) => setPassword(e.target.value)}
         placeholder="Password"
-        className="border-2"
+        className="border-2 border-gray-300 text-white placeholder:text-white/80 focus:border-white focus:ring-1 focus:ring-white dark:border-gray-700 dark:text-gray-200 dark:placeholder:text-gray-500 dark:focus:border-gray-500"
       />
       <Button 
         onClick={handleEmailAuth}
-        className="bg-primary"
+        className="bg-white text-gray-900 hover:bg-gray-100 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100"
       >
         {isSignUp ? 'Sign Up' : 'Sign In'}
       </Button>
