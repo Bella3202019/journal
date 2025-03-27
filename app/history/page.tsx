@@ -95,6 +95,7 @@ export default function HistoryPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [expandedChatId, setExpandedChatId] = useState<string | null>(null);
   const [showLoginDialog, setShowLoginDialog] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   
   // 分页相关状态
   const [page, setPage] = useState(1);
@@ -103,6 +104,7 @@ export default function HistoryPage() {
   const [allChats, setAllChats] = useState<any[]>([]);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [readyChats, setReadyChats] = useState<FormattedChat[]>([]);
+  const [initialLoading, setInitialLoading] = useState(true);
 
   // 添加并行加载状态
   const [loadingStates, setLoadingStates] = useState<Record<string, boolean>>({});
@@ -302,8 +304,6 @@ export default function HistoryPage() {
     }
   };
 
-  const [initialLoading, setInitialLoading] = useState(true);
-
   // 处理登录成功
   const handleAuthSuccess = () => {
     setShowLoginDialog(false);
@@ -311,26 +311,34 @@ export default function HistoryPage() {
 
   // 修改 useEffect 以使用页面缓存
   useEffect(() => {
+    let isMounted = true;
+
     async function fetchHistory() {
       if (!user) {
-        setInitialLoading(false);
-        setShowLoginDialog(true);
+        if (isMounted) {
+          setInitialLoading(false);
+          setShowLoginDialog(true);
+        }
         return;
       }
 
       try {
-        setInitialLoading(true);
+        if (isMounted) {
+          setInitialLoading(true);
+          setError(null);
+        }
         
         // 检查页面缓存
         const pageCache = checkPageCache();
         if (pageCache) {
-          setAllChats(pageCache.allChats);
-          setReadyChats(pageCache.readyChats);
-          setPage(pageCache.page);
-          // 恢复加载状态
-          setLoadingStates(pageCache.loadingStates || {});
-          setInitialLoading(false);
-          setHasMore(pageCache.allChats.length > pageCache.readyChats.length);
+          if (isMounted) {
+            setAllChats(pageCache.allChats);
+            setReadyChats(pageCache.readyChats);
+            setPage(pageCache.page);
+            setLoadingStates(pageCache.loadingStates || {});
+            setInitialLoading(false);
+            setHasMore(pageCache.allChats.length > pageCache.readyChats.length);
+          }
           return;
         }
 
@@ -346,21 +354,32 @@ export default function HistoryPage() {
             return timeB - timeA;
           });
 
-        setAllChats(userChats);
-        await loadMoreChats(userChats, 1);
+        if (isMounted) {
+          setAllChats(userChats);
+          await loadMoreChats(userChats, 1);
+        }
         
       } catch (error) {
         console.error('Error fetching history:', error);
+        if (isMounted) {
+          setError('Failed to load history. Please try again.');
+          setInitialLoading(false);
+        }
       } finally {
-        setInitialLoading(false);
+        if (isMounted) {
+          setInitialLoading(false);
+        }
       }
     }
 
     fetchHistory();
+
+    return () => {
+      isMounted = false;
+    };
   }, [user, checkPageCache]);
 
-  // 修改 loadMoreChats 函数，不在这里更新缓存
-  // 因为我们已经通过 useEffect 实现了自动缓存更新
+  // 修改 loadMoreChats 函数
   const loadMoreChats = async (chats = allChats, currentPage = page) => {
     if (isLoadingMore) return;
     
@@ -376,26 +395,28 @@ export default function HistoryPage() {
       }
 
       // 1. 先检查缓存并显示缓存的数据
-      currentPageChats.forEach((chat, idx) => {
-        const cachedChat = getCachedChat(chat.id);
-        if (cachedChat) {
-          setReadyChats(prev => {
-            const newChats = [...prev];
-            const index = startIndex + idx;
-            newChats[index] = cachedChat;
-            return newChats;
-          });
+      const cachedChats = currentPageChats.map(chat => ({
+        chat,
+        cached: getCachedChat(chat.id)
+      }));
+
+      // 批量更新缓存的数据
+      const newChats = [...readyChats];
+      cachedChats.forEach(({ chat, cached }, idx) => {
+        if (cached) {
+          const index = startIndex + idx;
+          newChats[index] = cached;
         }
       });
+      setReadyChats(newChats);
 
       // 2. 过滤出需要加载的聊天
-      const chatsToLoad = currentPageChats.filter(
-        chat => !getCachedChat(chat.id)
-      );
+      const chatsToLoad = cachedChats
+        .filter(({ cached }) => !cached)
+        .map(({ chat }) => chat);
 
       if (chatsToLoad.length === 0) {
         setHasMore(endIndex < chats.length);
-        setIsLoadingMore(false);
         return;
       }
 
@@ -447,6 +468,7 @@ export default function HistoryPage() {
 
     } catch (error) {
       console.error('Error loading more chats:', error);
+      setError('Failed to load more chats. Please try again.');
     } finally {
       setIsLoadingMore(false);
     }
@@ -630,7 +652,20 @@ export default function HistoryPage() {
         "md:overflow-hidden overflow-auto",
         "h-[calc(100vh-60px)]"
       )}>
-        {initialLoading ? (
+        {error ? (
+          <div className="flex flex-col items-center justify-center h-full">
+            <p className="text-red-500 mb-4">{error}</p>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setError(null);
+                setInitialLoading(true);
+              }}
+            >
+              Try Again
+            </Button>
+          </div>
+        ) : initialLoading ? (
           <div className={cn(
             "grid gap-8",
             "grid-cols-1 md:grid-cols-3",
