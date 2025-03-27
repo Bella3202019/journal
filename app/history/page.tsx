@@ -15,6 +15,8 @@ import { app } from '@/lib/firebase';
 import { getUserChatIds } from '@/lib/db';
 import { motion } from 'framer-motion';
 import { lora } from "@/app/fonts";  // 确保导入 Lora 字体
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import Auth from "@/components/Auth";
 
 const AuthButton = dynamic(() => import("@/components/AuthButton"), {
   ssr: false,
@@ -88,10 +90,11 @@ interface PageCache {
 export default function HistoryPage() {
   const router = useRouter();
   const auth = getAuth(app);
-  const [user] = useAuthState(auth);
+  const [user, loading] = useAuthState(auth);
   const [formattedChats, setFormattedChats] = useState<FormattedChat[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [expandedChatId, setExpandedChatId] = useState<string | null>(null);
+  const [showLoginDialog, setShowLoginDialog] = useState(false);
   
   // 分页相关状态
   const [page, setPage] = useState(1);
@@ -301,11 +304,17 @@ export default function HistoryPage() {
 
   const [initialLoading, setInitialLoading] = useState(true);
 
+  // 处理登录成功
+  const handleAuthSuccess = () => {
+    setShowLoginDialog(false);
+  };
+
   // 修改 useEffect 以使用页面缓存
   useEffect(() => {
     async function fetchHistory() {
       if (!user) {
         setInitialLoading(false);
+        setShowLoginDialog(true);
         return;
       }
 
@@ -803,6 +812,18 @@ export default function HistoryPage() {
           </>
         )}
       </div>
+
+      {/* 登录对话框 */}
+      <Dialog open={showLoginDialog} onOpenChange={setShowLoginDialog}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className="text-white dark:text-gray-200">Sign in to view history</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <Auth onSuccess={handleAuthSuccess} />
+          </div>
+        </DialogContent>
+      </Dialog>
     </main>
   );
 } 
