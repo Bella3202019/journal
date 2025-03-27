@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { getAuth } from 'firebase/auth';
 import { useAuthState } from 'react-firebase-hooks/auth';
@@ -11,6 +11,16 @@ import { HumeService } from '@/lib/hume';
 import { ReturnChatEvent } from "hume/api/resources/empathicVoice";
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
+
+// 添加缓存相关的常量
+const CHAT_DETAIL_CACHE_PREFIX = 'chat_detail_';
+const CHAT_DETAIL_CACHE_EXPIRY = 1000 * 60 * 60; // 1小时缓存过期
+
+interface CachedChatDetail {
+  chatId: string;
+  events: ReturnChatEvent[];
+  timestamp: number;
+}
 
 interface ChatMessage {
   role: string;
@@ -31,7 +41,43 @@ export default function ChatHistoryDetail() {
   const [error, setError] = useState<string | null>(null);
   const [pageLoading, setPageLoading] = useState(true);
 
+  // 添加缓存相关函数
+  const getCachedChatDetail = useCallback((chatId: string): ReturnChatEvent[] | null => {
+    try {
+      const cached = localStorage.getItem(`${CHAT_DETAIL_CACHE_PREFIX}${chatId}`);
+      if (cached) {
+        const parsedCache: CachedChatDetail = JSON.parse(cached);
+        if (Date.now() - parsedCache.timestamp < CHAT_DETAIL_CACHE_EXPIRY) {
+          return parsedCache.events;
+        } else {
+          localStorage.removeItem(`${CHAT_DETAIL_CACHE_PREFIX}${chatId}`);
+        }
+      }
+    } catch (error) {
+      console.error('Error reading chat detail from cache:', error);
+    }
+    return null;
+  }, []);
+
+  const setCachedChatDetail = useCallback((chatId: string, events: ReturnChatEvent[]) => {
+    try {
+      const cacheData: CachedChatDetail = {
+        chatId,
+        events,
+        timestamp: Date.now()
+      };
+      localStorage.setItem(
+        `${CHAT_DETAIL_CACHE_PREFIX}${chatId}`, 
+        JSON.stringify(cacheData)
+      );
+    } catch (error) {
+      console.error('Error writing chat detail to cache:', error);
+    }
+  }, []);
+
   useEffect(() => {
+    let isMounted = true;
+
     async function fetchChatDetail() {
       if (loading) return;
       
@@ -44,7 +90,31 @@ export default function ChatHistoryDetail() {
         setPageLoading(true);
         setError(null);
         
+        // 检查缓存
+        const cachedEvents = getCachedChatDetail(params.id as string);
+        if (cachedEvents) {
+          const formattedMessages: ChatMessage[] = cachedEvents
+            .filter((event: ReturnChatEvent) => 
+              event.type === "USER_MESSAGE" || event.type === "AGENT_MESSAGE"
+            )
+            .map((event: ReturnChatEvent) => ({
+              role: event.role === "USER" ? 'Me' : 'Echo',
+              messageText: event.messageText || '',
+              timestamp: new Date(event.timestamp).toLocaleString()
+            }));
+
+          if (isMounted) {
+            setMessages(formattedMessages);
+            setPageLoading(false);
+          }
+          return;
+        }
+
+        // 如果没有缓存，从服务器获取
         const events = await HumeService.getChatEvents(params.id as string);
+        
+        // 缓存获取到的数据
+        setCachedChatDetail(params.id as string, events);
         
         const formattedMessages: ChatMessage[] = events
           .filter((event: ReturnChatEvent) => 
@@ -56,18 +126,27 @@ export default function ChatHistoryDetail() {
             timestamp: new Date(event.timestamp).toLocaleString()
           }));
 
-        setMessages(formattedMessages);
+        if (isMounted) {
+          setMessages(formattedMessages);
+        }
       } catch (error: any) {
-        console.error('Error fetching chat detail:', error);
-        setError(error?.message || 'Failed to load chat history');
-        setMessages([]);
+        if (isMounted) {
+          setError(error?.message || 'Failed to load chat history');
+          setMessages([]);
+        }
       } finally {
-        setPageLoading(false);
+        if (isMounted) {
+          setPageLoading(false);
+        }
       }
     }
 
     fetchChatDetail();
-  }, [user, params.id, router, loading]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user, params.id, router, loading, getCachedChatDetail, setCachedChatDetail]);
 
   if (loading) {
     return <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">

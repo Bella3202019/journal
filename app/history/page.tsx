@@ -70,8 +70,16 @@ const gradientPositions = [
 // 添加缓存相关的常量和类型
 const CACHE_KEY_PREFIX = 'chat_history_';
 const CACHE_EXPIRY_TIME = 1000 * 60 * 30; // 30分钟缓存过期
+const CHAT_DETAIL_CACHE_PREFIX = 'chat_detail_';
+const CHAT_DETAIL_CACHE_EXPIRY = 1000 * 60 * 60; // 1小时缓存过期
 
 interface CachedChat extends FormattedChat {
+  timestamp: number;
+}
+
+interface CachedChatDetail {
+  chatId: string;
+  events: ReturnChatEvent[];
   timestamp: number;
 }
 
@@ -180,6 +188,40 @@ export default function HistoryPage() {
       console.error('Error updating page cache:', error);
     }
   }, [allChats, readyChats, page, loadingStates]);
+
+  // 添加通话详情缓存相关函数
+  const getCachedChatDetail = useCallback((chatId: string): ReturnChatEvent[] | null => {
+    try {
+      const cached = localStorage.getItem(`${CHAT_DETAIL_CACHE_PREFIX}${chatId}`);
+      if (cached) {
+        const parsedCache: CachedChatDetail = JSON.parse(cached);
+        if (Date.now() - parsedCache.timestamp < CHAT_DETAIL_CACHE_EXPIRY) {
+          return parsedCache.events;
+        } else {
+          localStorage.removeItem(`${CHAT_DETAIL_CACHE_PREFIX}${chatId}`);
+        }
+      }
+    } catch (error) {
+      console.error('Error reading chat detail from cache:', error);
+    }
+    return null;
+  }, []);
+
+  const setCachedChatDetail = useCallback((chatId: string, events: ReturnChatEvent[]) => {
+    try {
+      const cacheData: CachedChatDetail = {
+        chatId,
+        events,
+        timestamp: Date.now()
+      };
+      localStorage.setItem(
+        `${CHAT_DETAIL_CACHE_PREFIX}${chatId}`, 
+        JSON.stringify(cacheData)
+      );
+    } catch (error) {
+      console.error('Error writing chat detail to cache:', error);
+    }
+  }, []);
 
   const formatChatEvents = async (chat: { 
     chatId: string; 
@@ -474,7 +516,7 @@ export default function HistoryPage() {
     }
   };
 
-  // 添加缓存清理函数
+  // 修改缓存清理函数
   const clearExpiredCache = useCallback(() => {
     try {
       Object.keys(localStorage).forEach(key => {
@@ -483,6 +525,15 @@ export default function HistoryPage() {
           if (cached) {
             const parsedCache: CachedChat = JSON.parse(cached);
             if (Date.now() - parsedCache.timestamp >= CACHE_EXPIRY_TIME) {
+              localStorage.removeItem(key);
+            }
+          }
+        }
+        if (key.startsWith(CHAT_DETAIL_CACHE_PREFIX)) {
+          const cached = localStorage.getItem(key);
+          if (cached) {
+            const parsedCache: CachedChatDetail = JSON.parse(cached);
+            if (Date.now() - parsedCache.timestamp >= CHAT_DETAIL_CACHE_EXPIRY) {
               localStorage.removeItem(key);
             }
           }
@@ -513,39 +564,55 @@ export default function HistoryPage() {
     }
   }, [allChats, readyChats, page, loadingStates, initialLoading, updatePageCache]);
 
-  const toggleChat = (chatId: string) => {
-    router.push(`/history/${chatId}`);
+  const toggleChat = async (chatId: string) => {
+    try {
+      // 检查是否有缓存的通话详情
+      const cachedEvents = getCachedChatDetail(chatId);
+      
+      if (cachedEvents) {
+        // 如果有缓存，直接跳转
+        router.push(`/history/${chatId}`);
+        return;
+      }
+
+      // 如果没有缓存，先获取通话详情
+      const events = await HumeService.getChatEvents(chatId);
+      
+      // 立即缓存通话详情
+      setCachedChatDetail(chatId, events);
+      
+      // 等待一个微任务周期，确保缓存写入完成
+      await Promise.resolve();
+      
+      // 跳转到详情页
+      router.push(`/history/${chatId}`);
+    } catch (error) {
+      // 即使出错也跳转，让详情页处理错误状态
+      router.push(`/history/${chatId}`);
+    }
   };
 
   // 重新生成poem的函数
   const regeneratePoem = async (chatId: string, index: number) => {
     if (regeneratingPoems[chatId]) return; // 防止重复点击
     
-    console.log(`开始重新生成摘要, chatId: ${chatId}, index: ${index}`);
-    
     try {
       // 设置正在重新生成状态
       setRegeneratingPoems(prev => ({ ...prev, [chatId]: true }));
       
       // 获取聊天事件
-      console.log(`正在获取聊天事件, chatId: ${chatId}`);
       const events = await HumeService.getChatEvents(chatId);
-      console.log(`成功获取聊天事件, 事件数量: ${events.length}`);
       
       // 提取对话内容
       const relevantEvents = events.filter(
         event => event.type === "USER_MESSAGE" || event.type === "AGENT_MESSAGE"
       );
-      console.log(`筛选出相关消息事件: ${relevantEvents.length}/${events.length}`);
       
       const conversation = relevantEvents
         .map(event => `${event.role === "USER" ? "User" : "Dela"}: ${event.messageText || ''}`)
         .join('\n');
       
-      console.log(`对话内容长度: ${conversation.length} 字符`);
-      
       // 调用API强制重新生成
-      console.log(`正在调用 /api/generate-poem API 重新生成摘要`);
       const response = await fetch('/api/generate-poem', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -557,27 +624,20 @@ export default function HistoryPage() {
       });
       
       if (!response.ok) {
-        console.error(`API 调用失败, 状态码: ${response.status}`);
         throw new Error(`API failed with status ${response.status}`);
       }
       
       const data = await response.json();
-      console.log(`API 返回数据:`, data);
       
       if (data.poem) {
-        console.log(`成功获取新摘要: "${data.poem}"`);
-        
         // 更新UI
         setReadyChats(prev => {
           const newChats = [...prev];
           if (newChats[index]) {
-            console.log(`更新 UI, 从 "${newChats[index].summary}" 到 "${data.poem}"`);
             newChats[index] = {
               ...newChats[index],
               summary: data.poem
             };
-          } else {
-            console.warn(`无法更新 UI, 索引 ${index} 不存在于 readyChats 中`);
           }
           return newChats;
         });
@@ -585,7 +645,6 @@ export default function HistoryPage() {
         // 更新缓存
         const chat = readyChats[index];
         if (chat) {
-          console.log(`更新本地缓存 ${CACHE_KEY_PREFIX}${chatId}`);
           setCachedChat(chatId, {
             ...chat,
             summary: data.poem
@@ -593,16 +652,12 @@ export default function HistoryPage() {
         }
         
         // 更新页面缓存
-        console.log(`更新页面缓存 ${PAGE_CACHE_KEY}`);
         updatePageCache();
-      } else {
-        console.error(`API 返回数据中没有 poem 字段:`, data);
       }
     } catch (error) {
-      console.error(`重新生成摘要出错:`, error);
+      // 错误处理
     } finally {
       // 重置状态
-      console.log(`重置重新生成状态 chatId: ${chatId}`);
       setRegeneratingPoems(prev => ({ ...prev, [chatId]: false }));
     }
   };
